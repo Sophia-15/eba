@@ -21,6 +21,7 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
   const [suggestionPool, setSuggestionPool] = useState<
     Array<{ title: string; artist: string }>
   >([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   type Suggestion = {
     key: string;
@@ -109,11 +110,23 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    setShowSuggestions(false);
     submit();
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') submit();
+    if (e.key === 'Enter') {
+      setShowSuggestions(false);
+      submit();
+    }
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  }
+
+  function handleSuggestionSelect(suggestion: Suggestion) {
+    setInputValue(`${suggestion.title} - ${suggestion.artist}`);
+    setShowSuggestions(false);
   }
 
   return (
@@ -138,21 +151,30 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
             className={styles.input}
             type="text"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              setShowSuggestions(true);
+            }}
             onKeyDown={onKeyDown}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              // Delay so click handlers in suggestion buttons can run first.
+              setTimeout(() => setShowSuggestions(false), 120);
+            }}
             placeholder="Guess the song title..."
             autoComplete="off"
             spellCheck={false}
             aria-label="Song title guess"
           />
-          {suggestions.length > 0 && (
+          {showSuggestions && suggestions.length > 0 && (
             <div className={styles.suggestions}>
               {suggestions.map((suggestion) => (
                 <button
                   key={suggestion.key}
                   type="button"
                   className={styles.suggestionBtn}
-                  onClick={() => setInputValue(suggestion.title)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleSuggestionSelect(suggestion)}
                 >
                   {suggestion.title} - {suggestion.artist}
                 </button>

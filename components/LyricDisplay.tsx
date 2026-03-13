@@ -15,7 +15,7 @@ export default function LyricDisplay({
   revealedCount,
   lyricsStatus = 'ready',
 }: LyricDisplayProps) {
-  const visibleCount = Math.min(revealedCount + 1, snippets.length);
+  const visibleCount = Math.min(Math.max(revealedCount, 1), snippets.length);
   const visibleSnippets = snippets.slice(0, visibleCount);
 
   if (snippets.length === 0) {

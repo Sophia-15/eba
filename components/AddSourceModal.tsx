@@ -88,28 +88,34 @@ export default function AddSourceModal({
           const { meta } = await getAlbum(id);
           setResults([
             {
-              id: meta.id,
+              id: meta.id as string,
               type: 'album',
-              name: meta.name,
+              name: meta.name as string,
               ownerOrArtist:
                 (meta.artists as Array<{ name: string }>)?.[0]?.name ??
                 'Unknown',
               imageUrl: (meta.images as Array<{ url: string }>)?.[0]?.url ?? '',
-              trackCount: meta.total_tracks || meta.totalTracks || 0,
+              trackCount:
+                (meta.total_tracks as number) ||
+                (meta.totalTracks as number) ||
+                0,
             },
           ]);
         } else {
           const { meta } = await getPlaylist(id);
           setResults([
             {
-              id: meta.id,
+              id: meta.id as string,
               type: 'playlist',
-              name: meta.name,
+              name: meta.name as string,
               ownerOrArtist:
                 (meta.owner as { display_name?: string })?.display_name ??
                 'Unknown',
               imageUrl: (meta.images as Array<{ url: string }>)?.[0]?.url ?? '',
-              trackCount: meta.tracks?.total || meta.totalTracks || 0,
+              trackCount:
+                (meta.tracks as { total?: number })?.total ||
+                (meta.totalTracks as number) ||
+                0,
             },
           ]);
         }
@@ -119,7 +125,7 @@ export default function AddSourceModal({
       const data = await searchSpotify(query, 'playlist,album', 30);
 
       const playlists: SearchResult[] = (data.playlists?.items ?? [])
-        .filter((p: any) => p) // Safety check
+        .filter((p: unknown) => p) // Safety check
         .map(
           (p: {
             id: string;
@@ -138,7 +144,7 @@ export default function AddSourceModal({
         );
 
       const albums: SearchResult[] = (data.albums?.items ?? [])
-        .filter((a: any) => a) // Safety check
+        .filter((a: unknown) => a) // Safety check
         .map(
           (a: {
             id: string;

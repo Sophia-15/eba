@@ -21,6 +21,25 @@
   color: var(--color-text);
 }
 
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.875rem;
+  background: var(--color-surface);
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
 .subheading {
   margin: 0 0 1rem;
   font-size: 1rem;
@@ -85,6 +104,12 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 0.625rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.historyRow:hover {
+  border-color: var(--color-accent);
 }
 
 .historyLeft { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -120,7 +145,99 @@
   color: var(--color-text-muted);
 }
 
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 300;
+}
+
+.modal {
+  width: min(680px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 0.875rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--color-text);
+}
+
+.modalClose {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+.modalStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.modalStats p {
+  margin: 0;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.modalRounds {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.roundRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.7rem;
+}
+
+.roundNumber {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  width: 2rem;
+}
+
+.roundTitle {
+  flex: 1;
+  font-size: 0.88rem;
+}
+
+.roundState {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
 @media (max-width: 480px) {
   .statsGrid { grid-template-columns: repeat(2, 1fr); }
   .container { padding: 1rem; }
+  .modalStats { grid-template-columns: 1fr; }
 }

@@ -32,6 +32,23 @@ function normaliseForGuess(str: string): string {
     .trim();
 }
 
+function splitGuessParts(input: string): {
+  titlePart: string;
+  artistPart: string;
+} {
+  const separators = [' - ', ' — ', ' – ', '-', '—', '–'];
+  const found = separators.find((sep) => input.includes(sep));
+  if (!found) {
+    return { titlePart: input, artistPart: '' };
+  }
+
+  const [titlePart, ...artistParts] = input.split(found);
+  return {
+    titlePart: titlePart.trim(),
+    artistPart: artistParts.join(found).trim(),
+  };
+}
+
 export function validateGuess(input: string, correctAnswer: string): boolean {
   const normInput = normaliseForGuess(input);
   const normAnswer = normaliseForGuess(correctAnswer);
@@ -50,23 +67,37 @@ export function evaluateGuess(
   correctTitle: string,
   artistName: string,
 ): GuessResult {
-  if (validateGuess(input, correctTitle)) {
+  const { titlePart, artistPart } = splitGuessParts(input);
+
+  if (
+    validateGuess(input, correctTitle) ||
+    validateGuess(titlePart, correctTitle)
+  ) {
     return GuessResult.CORRECT;
   }
 
   const normInput = normaliseForGuess(input);
+  const normTitlePart = normaliseForGuess(titlePart);
+  const normArtistPart = normaliseForGuess(artistPart);
   const normArtist = normaliseForGuess(artistName);
 
   if (normInput && normArtist) {
-    const artistDistance = levenshtein(normInput, normArtist);
     const artistMaxDistance =
       normArtist.length <= 6 ? 1 : Math.floor(normArtist.length * 0.15);
 
-    const artistMatched =
-      normInput === normArtist ||
-      normArtist.includes(normInput) ||
-      normInput.includes(normArtist) ||
-      artistDistance <= artistMaxDistance;
+    const artistCandidates = [normInput, normTitlePart, normArtistPart].filter(
+      Boolean,
+    );
+
+    const artistMatched = artistCandidates.some((candidate) => {
+      const candidateDistance = levenshtein(candidate, normArtist);
+      return (
+        candidate === normArtist ||
+        normArtist.includes(candidate) ||
+        candidate.includes(normArtist) ||
+        candidateDistance <= artistMaxDistance
+      );
+    });
 
     if (artistMatched) {
       return GuessResult.PARTIAL;

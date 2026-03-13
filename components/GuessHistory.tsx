@@ -6,17 +6,9 @@ import styles from './GuessHistory.module.css';
 
 interface GuessHistoryProps {
   guesses: Guess[];
-  maxGuesses?: number;
 }
 
-export default function GuessHistory({
-  guesses,
-  maxGuesses = 6,
-}: GuessHistoryProps) {
-  const emptySlots = Array.from({
-    length: Math.max(0, maxGuesses - guesses.length),
-  });
-
+export default function GuessHistory({ guesses }: GuessHistoryProps) {
   return (
     <div className={styles.container}>
       {guesses.map((guess) => (
@@ -38,11 +30,6 @@ export default function GuessHistory({
               ? 'Skipped'
               : guess.text || '—'}
           </span>
-        </div>
-      ))}
-      {emptySlots.map((_, i) => (
-        <div key={`empty-${i}`} className={`${styles.slot} ${styles.empty}`}>
-          <span className={styles.icon}>○</span>
         </div>
       ))}
     </div>

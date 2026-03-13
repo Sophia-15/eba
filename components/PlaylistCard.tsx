@@ -1,33 +1,20 @@
 'use client';
 
-import { Disc3, ListMusic, Play, RefreshCw, Trash2 } from 'lucide-react';
+import { Disc3, ListMusic, Play, Trash2 } from 'lucide-react';
 import type { StoredSource } from '@/types/storage';
-import type { SyncProgress } from '@/contexts/PlaylistContext';
 import styles from './PlaylistCard.module.css';
 
 interface PlaylistCardProps {
   source: StoredSource;
-  syncProgress?: SyncProgress;
   onPlay: (source: StoredSource) => void;
   onDelete: (id: string) => void;
-  onSyncLyrics: (sourceId: string) => void;
 }
 
 export default function PlaylistCard({
   source,
-  syncProgress,
   onPlay,
   onDelete,
-  onSyncLyrics,
 }: PlaylistCardProps) {
-  const isSyncing = !!syncProgress && syncProgress.total > 0;
-  const syncPercent = isSyncing
-    ? Math.round(
-        ((syncProgress.fetched + syncProgress.failed) / syncProgress.total) *
-          100,
-      )
-    : 0;
-
   return (
     <div className={styles.card}>
       <div className={styles.imageWrapper}>
@@ -60,36 +47,10 @@ export default function PlaylistCard({
         <p className={styles.meta}>
           {source.trackCount} track{source.trackCount !== 1 ? 's' : ''}
         </p>
-
-        {isSyncing && (
-          <div className={styles.syncWrapper}>
-            <div className={styles.syncBar}>
-              <div
-                className={styles.syncFill}
-                style={{ width: `${syncPercent}%` }}
-              />
-            </div>
-            <p className={styles.syncLabel}>
-              Fetching lyrics... {syncProgress.fetched + syncProgress.failed}/
-              {syncProgress.total}
-            </p>
-          </div>
-        )}
       </div>
 
       <div className={styles.actions}>
-        <button
-          className={styles.syncBtn}
-          onClick={() => onSyncLyrics(source.id)}
-          disabled={isSyncing}
-        >
-          <RefreshCw size={16} /> {isSyncing ? 'Syncing' : 'Sync'}
-        </button>
-        <button
-          className={styles.playBtn}
-          onClick={() => onPlay(source)}
-          disabled={isSyncing && syncProgress.fetched === 0}
-        >
+        <button className={styles.playBtn} onClick={() => onPlay(source)}>
           <Play size={16} /> Play
         </button>
         <button

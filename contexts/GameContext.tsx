@@ -36,6 +36,8 @@ interface GameContextValue {
     sourceName: string,
     songs: StoredSong[],
     mode?: GameMode,
+    difficultyMode?: 'easy' | 'hard',
+    trackCount?: number,
   ) => Promise<void>;
   submitGuess: (text: string) => void;
   skipHint: () => void;
@@ -68,7 +70,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const hydrateRoundLyrics = useCallback(
     async (round: GameRound): Promise<GameRound> => {
       if (round.snippets.length > 0 || round.lyrics) {
-        return { ...round, lyricsStatus: 'ready' };
+        return {
+          ...round,
+          lyricsStatus: 'ready',
+          hintsRevealed:
+            round.snippets.length > 0
+              ? Math.max(round.hintsRevealed, 1)
+              : round.hintsRevealed,
+        };
       }
 
       let lyrics = (await getLyricsBySongId(round.songId))?.lyrics ?? '';
@@ -105,8 +114,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         ...round,
         lyrics,
         lyricsStatus: lyrics ? ('ready' as const) : ('unavailable' as const),
-        snippets: selectLyricSnippets(lyrics, 5),
-        hintsRevealed: 0,
+        snippets: selectLyricSnippets(lyrics, MAX_GUESSES),
+        hintsRevealed: lyrics ? 1 : 0,
       };
     },
     [],
@@ -118,6 +127,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sourceName: string,
       songs: StoredSong[],
       mode = GameMode.PLAYLIST,
+      difficultyMode: 'easy' | 'hard' = 'hard',
+      trackCount = 10,
     ) => {
       setIsLoading(true);
       setError(null);
@@ -130,7 +141,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           throw new Error(msg);
         }
 
-        const shuffled = shuffleSongs(songs).slice(0, 10);
+        const normalizedTrackCount = Math.max(
+          1,
+          Math.min(50, Math.floor(trackCount)),
+        );
+        const shuffled = shuffleSongs(songs).slice(0, normalizedTrackCount);
 
         const rounds: GameRound[] = shuffled.map(
           (song): GameRound => ({
@@ -162,6 +177,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           playlistId: sourceId,
           playlistName: sourceName,
           mode,
+          difficultyMode,
           rounds,
           currentRoundIndex: 0,
           totalScore: 0,
@@ -195,15 +211,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const guess = buildGuess(text, result);
       const updatedGuesses = [...round.guesses, guess];
       const completed = isGameRoundComplete(updatedGuesses, MAX_GUESSES);
+      const nextHints = Math.min(
+        updatedGuesses.length + 1,
+        round.snippets.length,
+      );
 
       const score =
         result === GuessResult.CORRECT
-          ? calculateScore(updatedGuesses.length, round.hintsRevealed)
+          ? calculateScore(
+              updatedGuesses.length,
+              Math.max(0, round.hintsRevealed - 1),
+            )
           : 0;
 
       const updatedRound: GameRound = {
         ...round,
         guesses: updatedGuesses,
+        hintsRevealed: nextHints,
         completed,
         score,
         completedAt: completed ? Date.now() : undefined,
@@ -229,11 +253,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const round = prev.rounds[prev.currentRoundIndex];
       if (!round || round.completed) return prev;
 
-      const nextHints = Math.min(
-        round.hintsRevealed + 1,
-        round.snippets.length,
-      );
-
       const updatedGuesses = [
         ...round.guesses,
         {
@@ -243,6 +262,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           timestamp: Date.now(),
         },
       ];
+      const nextHints = Math.min(
+        updatedGuesses.length + 1,
+        round.snippets.length,
+      );
 
       // Skipping consumes an attempt; round ends only when attempts are exhausted.
       const completed = updatedGuesses.length >= MAX_GUESSES;

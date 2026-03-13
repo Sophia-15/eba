@@ -53,6 +53,19 @@ export default function GameBoard({ onExit }: GameBoardProps) {
 
   if (!currentRound) return null;
 
+  if (gameState.status === 'round_over') {
+    return (
+      <div className={styles.board}>
+        <RoundResult
+          round={currentRound}
+          roundNumber={gameState.currentRoundIndex + 1}
+          totalRounds={gameState.rounds.length}
+          onNext={nextRound}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.board}>
       <div className={styles.progress}>
@@ -72,13 +85,14 @@ export default function GameBoard({ onExit }: GameBoardProps) {
         </span>
       </div>
 
-      <AudioPlayer
-        spotifyId={currentRound.spotifyId}
+      {/* <AudioPlayer
         previewUrl={currentRound.previewUrl}
         albumArt={currentRound.albumArt}
         songTitle={currentRound.songTitle}
         artistName={currentRound.artistName}
-      />
+        attemptsUsed={currentRound.guesses.length}
+        difficultyMode={gameState.difficultyMode}
+      /> */}
 
       <LyricDisplay
         snippets={currentRound.snippets}
@@ -86,19 +100,8 @@ export default function GameBoard({ onExit }: GameBoardProps) {
         lyricsStatus={currentRound.lyricsStatus}
       />
 
-      {gameState.status === 'round_over' ? (
-        <RoundResult
-          round={currentRound}
-          roundNumber={gameState.currentRoundIndex + 1}
-          totalRounds={gameState.rounds.length}
-          onNext={nextRound}
-        />
-      ) : (
-        <>
-          <GuessHistory guesses={currentRound.guesses} />
-          <GuessInput attemptsUsed={currentRound.guesses.length} />
-        </>
-      )}
+      <GuessHistory guesses={currentRound.guesses} />
+      <GuessInput attemptsUsed={currentRound.guesses.length} />
     </div>
   );
 }

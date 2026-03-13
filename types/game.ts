@@ -50,6 +50,7 @@ export interface GameState {
   playlistId: string;
   playlistName: string;
   mode: GameMode;
+  difficultyMode: 'easy' | 'hard';
   rounds: GameRound[];
   currentRoundIndex: number;
   totalScore: number;

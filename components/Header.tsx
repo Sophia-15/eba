@@ -22,7 +22,7 @@ export default function Header({ activeTab, onTabChange }: HeaderProps) {
     <header className={styles.header}>
       <div className={styles.brand}>
         <span className={styles.logo}>🎵</span>
-        <span className={styles.title}>Lyricle</span>
+        <span className={styles.title}>To be Named</span>
       </div>
       <nav className={styles.nav}>
         {TABS.map((tab) => (

@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Music2, Plus, Play, RefreshCw } from 'lucide-react';
+import { Music2, Plus, Play, X } from 'lucide-react';
 import type { StoredSource } from '@/types/storage';
-import type { SyncProgress } from '@/contexts/PlaylistContext';
 import { usePlaylist } from '@/contexts/PlaylistContext';
 import { useGame } from '@/contexts/GameContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { GameMode } from '@/types/game';
+import { shuffleSongs } from '@/lib/gameLogic';
 import PlaylistCard from './PlaylistCard';
 import AddSourceModal from './AddSourceModal';
 import EmptyState from './EmptyState';
@@ -18,23 +19,28 @@ interface PlaylistManagerProps {
   onStartGame: () => void;
 }
 
+type PendingStart =
+  | { kind: 'all' }
+  | { kind: 'source'; source: StoredSource }
+  | null;
+
 export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
   const {
     sources,
     isLoading,
-    syncProgress,
     addPlaylist,
     addAlbum,
     removeSource,
     getSongsForSource,
     getAllSongs,
-    syncLyricsForSource,
-    syncLyricsForAll,
   } = usePlaylist();
   const { startGame } = useGame();
+  const { updatePreferences } = useSettings();
   const [showModal, setShowModal] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
-  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [pendingStart, setPendingStart] = useState<PendingStart>(null);
+  const [pendingDelete, setPendingDelete] = useState<StoredSource | null>(null);
+  const [tracksToGuess, setTracksToGuess] = useState(10);
 
   async function handleAdd(id: string, type: 'playlist' | 'album') {
     if (type === 'playlist') {
@@ -44,7 +50,14 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
     }
   }
 
-  async function handlePlayAll() {
+  function handlePlayAll() {
+    setPendingStart({ kind: 'all' });
+  }
+
+  async function runPlayAll(
+    difficultyMode: 'easy' | 'hard',
+    trackCount: number,
+  ) {
     setIsStarting(true);
     try {
       const allSongs = await getAllSongs();
@@ -52,70 +65,89 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
       const uniqueSongs = Array.from(
         new Map(allSongs.map((s) => [s.id, s])).values(),
       );
+      const shuffledSongs = shuffleSongs(uniqueSongs);
 
-      if (uniqueSongs.length === 0) {
+      if (shuffledSongs.length === 0) {
         toast.error('Your library is empty. Add a playlist or album first.');
         return;
       }
 
-      await startGame('library', 'My Library', uniqueSongs, GameMode.PLAYLIST);
+      await startGame(
+        'library',
+        'My Library',
+        shuffledSongs,
+        GameMode.PLAYLIST,
+        difficultyMode,
+        trackCount,
+      );
       onStartGame();
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to start game');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to start game';
+      toast.error(message);
     } finally {
       setIsStarting(false);
     }
   }
 
-  async function handleSyncAllLyrics() {
-    setIsSyncingAll(true);
-    toast.info('Starting lyrics sync for all sources...');
-    try {
-      await syncLyricsForAll();
-      toast.success('Lyrics sync completed for all sources.');
-    } catch (err: any) {
-      toast.error(err?.message || 'Lyrics sync failed');
-    } finally {
-      setIsSyncingAll(false);
-    }
+  function handlePlay(source: StoredSource) {
+    setPendingStart({ kind: 'source', source });
   }
 
-  async function handlePlay(source: StoredSource) {
+  async function runPlaySource(
+    source: StoredSource,
+    difficultyMode: 'easy' | 'hard',
+    trackCount: number,
+  ) {
     try {
       const songs = await getSongsForSource(source.id);
-      await startGame(source.id, source.name, songs, GameMode.PLAYLIST);
+      await startGame(
+        source.id,
+        source.name,
+        songs,
+        GameMode.PLAYLIST,
+        difficultyMode,
+        trackCount,
+      );
       onStartGame();
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to start game');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to start game';
+      toast.error(message);
     }
   }
 
-  async function handleDelete(id: string) {
-    if (confirm('Remove this from your library?')) {
-      await removeSource(id);
+  async function handleModeChoice(difficultyMode: 'easy' | 'hard') {
+    if (!pendingStart) return;
+
+    updatePreferences({ difficulty: difficultyMode });
+
+    const startIntent = pendingStart;
+    setPendingStart(null);
+    const selectedTrackCount = Math.max(
+      1,
+      Math.min(50, Math.floor(tracksToGuess)),
+    );
+
+    if (startIntent.kind === 'all') {
+      await runPlayAll(difficultyMode, selectedTrackCount);
+      return;
     }
+
+    await runPlaySource(startIntent.source, difficultyMode, selectedTrackCount);
   }
 
-  async function handleSyncLyricsForSource(sourceId: string) {
-    toast.info('Starting lyrics sync...');
-    try {
-      await syncLyricsForSource(sourceId);
-      toast.success('Lyrics sync completed for this source.');
-    } catch (err: any) {
-      toast.error(err?.message || 'Lyrics sync failed');
-    }
+  function handleDelete(id: string) {
+    const source = sources.find((item) => item.id === id);
+    if (!source) return;
+    setPendingDelete(source);
   }
 
-  const totalSync = Array.from(syncProgress.values()).reduce(
-    (acc, item) => {
-      acc.fetched += item.fetched;
-      acc.failed += item.failed;
-      acc.total += item.total;
-      return acc;
-    },
-    { fetched: 0, failed: 0, total: 0 },
-  );
-  const hasSyncInProgress = totalSync.total > 0;
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    await removeSource(pendingDelete.id);
+    setPendingDelete(null);
+  }
 
   if (isLoading && sources.length === 0) {
     return (
@@ -130,17 +162,6 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
       <div className={styles.toolbar}>
         <h2 className={styles.heading}>My Library</h2>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          {sources.length > 0 && (
-            <button
-              className={styles.addBtn}
-              onClick={handleSyncAllLyrics}
-              disabled={isSyncingAll}
-              style={{ cursor: isSyncingAll ? 'wait' : 'pointer' }}
-            >
-              <RefreshCw size={16} />{' '}
-              {isSyncingAll ? 'Syncing...' : 'Sync Lyrics'}
-            </button>
-          )}
           {sources.length > 0 && (
             <button
               className={styles.addBtn}
@@ -160,13 +181,6 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
         </div>
       </div>
 
-      {hasSyncInProgress && (
-        <p className={styles.syncSummary}>
-          Syncing lyrics: {totalSync.fetched + totalSync.failed}/
-          {totalSync.total}
-        </p>
-      )}
-
       {sources.length === 0 ? (
         <EmptyState
           icon={<Music2 size={42} />}
@@ -183,10 +197,8 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
             <PlaylistCard
               key={source.id}
               source={source}
-              syncProgress={syncProgress.get(source.id)}
               onPlay={handlePlay}
               onDelete={handleDelete}
-              onSyncLyrics={handleSyncLyricsForSource}
             />
           ))}
         </div>
@@ -194,6 +206,117 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
 
       {showModal && (
         <AddSourceModal onAdd={handleAdd} onClose={() => setShowModal(false)} />
+      )}
+
+      {pendingStart && (
+        <div
+          className={styles.modeOverlay}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPendingStart(null);
+          }}
+        >
+          <div className={styles.modeModal} role="dialog" aria-modal="true">
+            <div className={styles.modeHeader}>
+              <h3 className={styles.modeTitle}>Choose your game mode</h3>
+              <button
+                type="button"
+                className={styles.modeCloseBtn}
+                onClick={() => setPendingStart(null)}
+                aria-label="Close mode selection"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className={styles.modeFootnote}>
+              Your choice is locked until this game ends.
+            </p>
+
+            <label className={styles.trackCountField}>
+              <span className={styles.trackCountLabel}>How many tracks?</span>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={tracksToGuess}
+                onChange={(e) => {
+                  const raw = Number(e.target.value);
+                  if (!Number.isFinite(raw)) return;
+                  setTracksToGuess(Math.max(1, Math.min(50, Math.floor(raw))));
+                }}
+                className={styles.trackCountInput}
+              />
+            </label>
+
+            <div className={styles.modeCards}>
+              <button
+                type="button"
+                className={`${styles.modeCard} ${styles.modeCardEasy}`}
+                onClick={() => void handleModeChoice('easy')}
+                disabled={isStarting}
+              >
+                <span className={styles.modeEmojiWrap}>
+                  <span className={styles.modeEmojiEasy}>🌬️</span>
+                </span>
+                <span className={styles.modeCardTitle}>Easy</span>
+                <span className={styles.modeCardDesc}>
+                  Cover is visible and gets clearer as guesses increase.
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.modeCard} ${styles.modeCardHard}`}
+                onClick={() => void handleModeChoice('hard')}
+                disabled={isStarting}
+              >
+                <span
+                  className={`${styles.modeEmojiWrap} ${styles.modeEmojiWrapHard}`}
+                >
+                  <span className={styles.modeEmojiHard}>🌬️</span>
+                </span>
+                <span className={styles.modeCardTitle}>Hard</span>
+                <span
+                  className={`${styles.modeCardDesc} ${styles.modeCardDescHard}`}
+                >
+                  Cover stays hidden during the whole round.
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <div
+          className={styles.deleteOverlay}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPendingDelete(null);
+          }}
+        >
+          <div className={styles.deleteModal} role="dialog" aria-modal="true">
+            <h3 className={styles.deleteTitle}>Remove source?</h3>
+            <p className={styles.deleteText}>
+              This will remove <strong>{pendingDelete.name}</strong> from your
+              library.
+            </p>
+            <div className={styles.deleteActions}>
+              <button
+                type="button"
+                className={styles.deleteCancelBtn}
+                onClick={() => setPendingDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.deleteConfirmBtn}
+                onClick={() => void confirmDelete()}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -2,7 +2,7 @@ export interface UserPreferences {
   volume: number; // 0-1
   theme: 'dark' | 'light' | 'system';
   autoPlay: boolean;
-  difficulty: 'easy' | 'normal' | 'hard';
+  difficulty: 'easy' | 'hard';
   maxGuesses: number; // default 6
 }
 
@@ -10,7 +10,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   volume: 0.7,
   theme: 'dark',
   autoPlay: true,
-  difficulty: 'normal',
+  difficulty: 'hard',
   maxGuesses: 6,
 };
 
@@ -25,7 +25,14 @@ export function getPreferences(): UserPreferences {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return DEFAULT_PREFERENCES;
-    return { ...DEFAULT_PREFERENCES, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Partial<UserPreferences> & {
+      difficulty?: string;
+    };
+    const difficulty =
+      parsed.difficulty === 'easy' || parsed.difficulty === 'hard'
+        ? parsed.difficulty
+        : DEFAULT_PREFERENCES.difficulty;
+    return { ...DEFAULT_PREFERENCES, ...parsed, difficulty };
   } catch {
     return DEFAULT_PREFERENCES;
   }

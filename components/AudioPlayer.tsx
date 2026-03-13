@@ -6,23 +6,26 @@ import { useAudio } from '@/hooks/useAudio';
 import styles from './AudioPlayer.module.css';
 
 interface AudioPlayerProps {
-  spotifyId: string;
   previewUrl: string;
   albumArt: string;
   songTitle: string;
   artistName: string;
-  autoPlay?: boolean;
+  attemptsUsed?: number;
+  difficultyMode: 'easy' | 'hard';
 }
 
 export default function AudioPlayer({
-  spotifyId,
   previewUrl,
   albumArt,
   songTitle,
   artistName,
-  autoPlay = false,
+  attemptsUsed = 0,
+  difficultyMode,
 }: AudioPlayerProps) {
   const audio = useAudio(previewUrl);
+  const isEasyMode = difficultyMode === 'easy';
+  const revealProgress = Math.min(1, Math.max(0, attemptsUsed / 6));
+  const blurPx = isEasyMode ? Math.max(0, 26 - revealProgress * 24) : 28;
 
   useEffect(() => {
     if (previewUrl) {
@@ -38,16 +41,29 @@ export default function AudioPlayer({
   return (
     <div className={styles.player}>
       <div className={styles.albumArt}>
-        {albumArt ? (
+        {albumArt && isEasyMode ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={albumArt} alt="Album art" className={styles.albumImage} />
+          <img
+            src={albumArt}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+            onContextMenu={(e) => e.preventDefault()}
+            className={styles.albumImage}
+            style={{ filter: `blur(${blurPx}px)` }}
+          />
         ) : (
-          <div className={styles.albumPlaceholder}>🎵</div>
+          <div className={styles.albumPlaceholder}>
+            {isEasyMode ? '🎵' : '🔒'}
+          </div>
         )}
-        <div
-          className={styles.blurredBg}
-          style={{ backgroundImage: `url(${albumArt})` }}
-        />
+        {albumArt && isEasyMode && (
+          <div
+            className={styles.blurredBg}
+            style={{ backgroundImage: `url(${albumArt})` }}
+          />
+        )}
       </div>
 
       <div className={styles.controls}>
