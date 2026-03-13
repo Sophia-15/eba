@@ -1,65 +1,49 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+
+import { useState } from 'react';
+import Header from '@/components/Header';
+import PlaylistManager from '@/components/PlaylistManager';
+import GameBoard from '@/components/GameBoard';
+import StatsPanel from '@/components/StatsPanel';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { useGame } from '@/contexts/GameContext';
+
+type Tab = 'playlists' | 'play' | 'stats';
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<Tab>('playlists');
+  const { gameState, endGame } = useGame();
+
+  function handleStartGame() {
+    setActiveTab('play');
+  }
+
+  function handleExitGame() {
+    endGame();
+    setActiveTab('playlists');
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div className="app-shell">
+      <Header activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="main-content">
+        <ErrorBoundary>
+          {activeTab === 'playlists' && (
+            <PlaylistManager onStartGame={handleStartGame} />
+          )}
+          {activeTab === 'play' &&
+            (gameState ? (
+              <GameBoard onExit={handleExitGame} />
+            ) : (
+              <div className="play-empty">
+                <p>
+                  No active game. Go to <strong>Library</strong> and press{' '}
+                  <strong>Play All</strong> (or Play on any source).
+                </p>
+              </div>
+            ))}
+          {activeTab === 'stats' && <StatsPanel />}
+        </ErrorBoundary>
       </main>
     </div>
   );
