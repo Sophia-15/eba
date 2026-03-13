@@ -69,7 +69,7 @@ export default function GameBoard({ onExit }: GameBoardProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 pb-80">
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
         <div className="mb-2 h-2 w-full overflow-hidden rounded-full bg-[var(--color-surface-2)]">
           <div
