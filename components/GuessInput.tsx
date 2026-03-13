@@ -5,7 +5,8 @@ import { type FormEvent, type KeyboardEvent } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { usePlaylist } from '@/contexts/PlaylistContext';
 import { useGuess } from '@/hooks/useGuess';
-import styles from './GuessInput.module.css';
+import { guessesReferToSameSong } from '@/lib/gameLogic';
+import { GuessResult } from '@/types/game';
 
 const MAX_GUESSES = 6;
 
@@ -14,9 +15,16 @@ interface GuessInputProps {
 }
 
 export default function GuessInput({ attemptsUsed }: GuessInputProps) {
-  const { inputValue, setInputValue, submit, skip, canSubmit, canSkip } =
-    useGuess();
-  const { gameState } = useGame();
+  const {
+    inputValue,
+    setInputValue,
+    submit,
+    skip,
+    canSubmit,
+    canSkip,
+    isDuplicateGuess,
+  } = useGuess();
+  const { gameState, currentRound } = useGame();
   const { getAllSongs, getSongsForSource } = usePlaylist();
   const [suggestionPool, setSuggestionPool] = useState<
     Array<{ title: string; artist: string }>
@@ -108,14 +116,27 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
       .slice(0, 6);
   }, [inputValue, suggestionPool]);
 
+  const previousGuesses = useMemo(
+    () =>
+      (currentRound?.guesses ?? [])
+        .map((guess) => guess.text)
+        .filter((text): text is string => text.trim().length > 0),
+    [currentRound],
+  );
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (isDuplicateGuess) return;
     setShowSuggestions(false);
     submit();
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
+      if (isDuplicateGuess) {
+        e.preventDefault();
+        return;
+      }
       setShowSuggestions(false);
       submit();
     }
@@ -130,25 +151,51 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.attempts}>
-        {Array.from({ length: MAX_GUESSES }).map((_, i) => (
-          <div
-            key={i}
-            className={`${styles.dot} ${i < attemptsUsed ? styles.used : ''}`}
-            aria-label={i < attemptsUsed ? 'used' : 'remaining'}
-          />
-        ))}
-        <span className={styles.attemptsLabel}>
-          {MAX_GUESSES - attemptsUsed} attempt
-          {MAX_GUESSES - attemptsUsed !== 1 ? 's' : ''} left
-        </span>
+    <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[0_18px_50px_rgba(0,0,0,0.2)]">
+      <div className="flex items-center justify-between">
+        <div className="mb-4 flex items-center gap-3">
+          {Array.from({ length: MAX_GUESSES }).map((_, i) =>
+            (() => {
+              const guessResult = currentRound?.guesses[i]?.result;
+              const dotClass =
+                guessResult === GuessResult.CORRECT
+                  ? 'bg-emerald-400'
+                  : guessResult === GuessResult.PARTIAL
+                    ? 'bg-amber-400'
+                    : guessResult === GuessResult.INCORRECT
+                      ? 'bg-red-400'
+                      : guessResult === GuessResult.SKIPPED
+                        ? 'bg-slate-400'
+                        : 'bg-[var(--color-surface-2)]';
+
+              return (
+                <div
+                  key={i}
+                  className={`h-3.5 w-3.5 rounded-full ${dotClass}`}
+                  aria-label={guessResult ? guessResult : 'remaining'}
+                />
+              );
+            })(),
+          )}
+          <span className="ml-2 text-sm font-medium text-[var(--color-text-muted)]">
+            {MAX_GUESSES - attemptsUsed} attempt
+            {MAX_GUESSES - attemptsUsed !== 1 ? 's' : ''} left
+          </span>
+        </div>
+
+        <button
+          className="mb-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={skip}
+          disabled={!canSkip}
+        >
+          ⏭ Skip (uses attempt)
+        </button>
       </div>
 
-      <form className={styles.form} onSubmit={onSubmit}>
-        <div className={styles.inputWrap}>
+      <form className="flex gap-3" onSubmit={onSubmit}>
+        <div className="relative flex-1">
           <input
-            className={styles.input}
+            className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-4 text-lg outline-none ring-[var(--color-accent)]/40 focus:ring-2"
             type="text"
             value={inputValue}
             onChange={(e) => {
@@ -167,33 +214,60 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
             aria-label="Song title guess"
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className={styles.suggestions}>
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion.key}
-                  type="button"
-                  className={styles.suggestionBtn}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleSuggestionSelect(suggestion)}
-                >
-                  {suggestion.title} - {suggestion.artist}
-                </button>
-              ))}
+            <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-2xl">
+              {suggestions.map((suggestion) => {
+                const alreadyGuessed = previousGuesses.some((guess) =>
+                  guessesReferToSameSong(
+                    guess,
+                    `${suggestion.title} - ${suggestion.artist}`,
+                  ),
+                );
+
+                return (
+                  <button
+                    key={suggestion.key}
+                    type="button"
+                    className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-base transition ${
+                      alreadyGuessed
+                        ? 'cursor-not-allowed bg-red-500/10 text-red-300 line-through'
+                        : 'hover:bg-[var(--color-surface-2)]'
+                    }`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      if (!alreadyGuessed) {
+                        handleSuggestionSelect(suggestion);
+                      }
+                    }}
+                    disabled={alreadyGuessed}
+                  >
+                    <span>
+                      {suggestion.title} - {suggestion.artist}
+                    </span>
+                    {alreadyGuessed && (
+                      <span className="ml-4 rounded-full border border-red-400/40 bg-red-500/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide no-underline">
+                        Tried
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
         <button
           type="submit"
-          className={styles.submitBtn}
+          className="rounded-2xl bg-[var(--color-accent)] px-6 py-4 text-lg font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!canSubmit}
         >
           Guess
         </button>
       </form>
 
-      <button className={styles.skipBtn} onClick={skip} disabled={!canSkip}>
-        ⏭ Skip (uses attempt)
-      </button>
+      {isDuplicateGuess && (
+        <p className="mt-3 text-sm font-semibold text-red-300">
+          You already tried that song in this round.
+        </p>
+      )}
     </div>
   );
 }

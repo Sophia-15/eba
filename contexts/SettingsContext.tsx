@@ -27,7 +27,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Sync across tabs
   useEffect(() => {
     function onStorage(e: StorageEvent) {
-      if (e.key === 'lyricle-preferences') {
+      if (e.key === 'tobenamed-preferences') {
         setPrefs(getPreferences());
       }
     }

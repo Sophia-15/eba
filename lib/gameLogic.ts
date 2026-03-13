@@ -22,7 +22,7 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-function normaliseForGuess(str: string): string {
+export function normaliseForGuess(str: string): string {
   return str
     .toLowerCase()
     .replace(/[''"`]/g, "'")
@@ -32,7 +32,7 @@ function normaliseForGuess(str: string): string {
     .trim();
 }
 
-function splitGuessParts(input: string): {
+export function splitGuessParts(input: string): {
   titlePart: string;
   artistPart: string;
 } {
@@ -47,6 +47,25 @@ function splitGuessParts(input: string): {
     titlePart: titlePart.trim(),
     artistPart: artistParts.join(found).trim(),
   };
+}
+
+export function guessesReferToSameSong(left: string, right: string): boolean {
+  const leftParts = splitGuessParts(left);
+  const rightParts = splitGuessParts(right);
+  const leftTitle = normaliseForGuess(leftParts.titlePart || left);
+  const rightTitle = normaliseForGuess(rightParts.titlePart || right);
+  const leftArtist = normaliseForGuess(leftParts.artistPart);
+  const rightArtist = normaliseForGuess(rightParts.artistPart);
+
+  if (!leftTitle || !rightTitle || leftTitle !== rightTitle) {
+    return false;
+  }
+
+  if (!leftArtist || !rightArtist) {
+    return true;
+  }
+
+  return leftArtist === rightArtist;
 }
 
 export function validateGuess(input: string, correctAnswer: string): boolean {

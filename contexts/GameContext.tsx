@@ -20,6 +20,7 @@ import {
   calculateScore,
   shuffleSongs,
   buildGuess,
+  guessesReferToSameSong,
   isGameRoundComplete,
 } from '@/lib/gameLogic';
 import { saveGameHistory, updateStatistics } from '@/lib/storage';
@@ -206,6 +207,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!prev || prev.status !== 'playing') return prev;
       const round = prev.rounds[prev.currentRoundIndex];
       if (!round || round.completed) return prev;
+
+      const alreadyGuessed = round.guesses.some(
+        (guess) => guess.text && guessesReferToSameSong(guess.text, text),
+      );
+
+      if (alreadyGuessed) return prev;
 
       const result = evaluateGuess(text, round.songTitle, round.artistName);
       const guess = buildGuess(text, result);

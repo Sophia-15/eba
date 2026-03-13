@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Music2, Plus, Play, X } from 'lucide-react';
+import { Music2, Plus, Play } from 'lucide-react';
 import type { StoredSource } from '@/types/storage';
 import { usePlaylist } from '@/contexts/PlaylistContext';
 import { useGame } from '@/contexts/GameContext';
@@ -10,10 +10,11 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { GameMode } from '@/types/game';
 import { shuffleSongs } from '@/lib/gameLogic';
 import PlaylistCard from './PlaylistCard';
-import AddSourceModal from './AddSourceModal';
+import AddSourceModal from './modals/AddSourceModal';
+import GameModeModal from './modals/GameModeModal';
+import RemoveSourceModal from './modals/RemoveSourceModal';
 import EmptyState from './EmptyState';
 import LoadingSpinner from './LoadingSpinner';
-import styles from './PlaylistManager.module.css';
 
 interface PlaylistManagerProps {
   onStartGame: () => void;
@@ -41,6 +42,7 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
   const [pendingStart, setPendingStart] = useState<PendingStart>(null);
   const [pendingDelete, setPendingDelete] = useState<StoredSource | null>(null);
   const [tracksToGuess, setTracksToGuess] = useState(10);
+  const [maxSongs, setMaxSongs] = useState(0);
 
   async function handleAdd(id: string, type: 'playlist' | 'album') {
     if (type === 'playlist') {
@@ -50,7 +52,10 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
     }
   }
 
-  function handlePlayAll() {
+  async function handlePlayAll() {
+    const allSongs = await getAllSongs();
+    setMaxSongs(allSongs.length);
+    setTracksToGuess(allSongs.length);
     setPendingStart({ kind: 'all' });
   }
 
@@ -91,6 +96,7 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
   }
 
   function handlePlay(source: StoredSource) {
+    setMaxSongs(Math.max(1, source.trackCount || 1));
     setPendingStart({ kind: 'source', source });
   }
 
@@ -124,9 +130,13 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
 
     const startIntent = pendingStart;
     setPendingStart(null);
+    const upperBound = Math.max(1, maxSongs || 1);
+    const normalizedInput = Number.isFinite(tracksToGuess)
+      ? Math.floor(tracksToGuess)
+      : 1;
     const selectedTrackCount = Math.max(
       1,
-      Math.min(50, Math.floor(tracksToGuess)),
+      Math.min(upperBound, normalizedInput),
     );
 
     if (startIntent.kind === 'all') {
@@ -151,33 +161,32 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
 
   if (isLoading && sources.length === 0) {
     return (
-      <div className={styles.loadingWrapper}>
+      <div className="flex min-h-[50vh] items-center justify-center">
         <LoadingSpinner label="Loading library..." />
       </div>
     );
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.toolbar}>
-        <h2 className={styles.heading}>My Library</h2>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8 px-4 py-8 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-3xl font-black">My Library</h2>
+        <div className="flex items-center gap-3">
+          <button
+            className="inline-flex h-12 items-center gap-2 rounded-2xl border border-[var(--color-border)] bg-transparent px-5 text-base font-semibold text-[var(--color-text)] transition hover:bg-[var(--color-surface-2)]"
+            onClick={() => setShowModal(true)}
+          >
+            <Plus size={18} /> Add Source
+          </button>
           {sources.length > 0 && (
             <button
-              className={styles.addBtn}
+              className="inline-flex h-12 items-center gap-2 rounded-2xl bg-[var(--color-accent)] px-6 text-base font-semibold text-white shadow-[0_14px_34px_color-mix(in_srbg,var(--color-accent)_30%,transparent)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
               onClick={handlePlayAll}
               disabled={isStarting}
-              style={{
-                backgroundColor: 'var(--color-primary)',
-                cursor: isStarting ? 'wait' : 'pointer',
-              }}
             >
-              <Play size={16} /> {isStarting ? 'Starting...' : 'Play All'}
+              <Play size={18} /> {isStarting ? 'Starting...' : 'Play All'}
             </button>
           )}
-          <button className={styles.addBtn} onClick={() => setShowModal(true)}>
-            <Plus size={16} /> Add Source
-          </button>
         </div>
       </div>
 
@@ -185,14 +194,14 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
         <EmptyState
           icon={<Music2 size={42} />}
           title="No music sources yet"
-          description="Add a Spotify playlist or album to start playing Lyricle!"
+          description="Add a Spotify playlist or album to start playing ToBeNamed!"
           action={{
             label: 'Add Playlist or Album',
             onClick: () => setShowModal(true),
           }}
         />
       ) : (
-        <div className={styles.grid}>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,260px))] justify-start gap-5">
           {sources.map((source) => (
             <PlaylistCard
               key={source.id}
@@ -209,114 +218,22 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
       )}
 
       {pendingStart && (
-        <div
-          className={styles.modeOverlay}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setPendingStart(null);
-          }}
-        >
-          <div className={styles.modeModal} role="dialog" aria-modal="true">
-            <div className={styles.modeHeader}>
-              <h3 className={styles.modeTitle}>Choose your game mode</h3>
-              <button
-                type="button"
-                className={styles.modeCloseBtn}
-                onClick={() => setPendingStart(null)}
-                aria-label="Close mode selection"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <p className={styles.modeFootnote}>
-              Your choice is locked until this game ends.
-            </p>
-
-            <label className={styles.trackCountField}>
-              <span className={styles.trackCountLabel}>How many tracks?</span>
-              <input
-                type="number"
-                min={1}
-                max={50}
-                value={tracksToGuess}
-                onChange={(e) => {
-                  const raw = Number(e.target.value);
-                  if (!Number.isFinite(raw)) return;
-                  setTracksToGuess(Math.max(1, Math.min(50, Math.floor(raw))));
-                }}
-                className={styles.trackCountInput}
-              />
-            </label>
-
-            <div className={styles.modeCards}>
-              <button
-                type="button"
-                className={`${styles.modeCard} ${styles.modeCardEasy}`}
-                onClick={() => void handleModeChoice('easy')}
-                disabled={isStarting}
-              >
-                <span className={styles.modeEmojiWrap}>
-                  <span className={styles.modeEmojiEasy}>🌬️</span>
-                </span>
-                <span className={styles.modeCardTitle}>Easy</span>
-                <span className={styles.modeCardDesc}>
-                  Cover is visible and gets clearer as guesses increase.
-                </span>
-              </button>
-              <button
-                type="button"
-                className={`${styles.modeCard} ${styles.modeCardHard}`}
-                onClick={() => void handleModeChoice('hard')}
-                disabled={isStarting}
-              >
-                <span
-                  className={`${styles.modeEmojiWrap} ${styles.modeEmojiWrapHard}`}
-                >
-                  <span className={styles.modeEmojiHard}>🌬️</span>
-                </span>
-                <span className={styles.modeCardTitle}>Hard</span>
-                <span
-                  className={`${styles.modeCardDesc} ${styles.modeCardDescHard}`}
-                >
-                  Cover stays hidden during the whole round.
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <GameModeModal
+          isStarting={isStarting}
+          tracksToGuess={tracksToGuess}
+          onTracksToGuessChange={setTracksToGuess}
+          onClose={() => setPendingStart(null)}
+          onChooseMode={handleModeChoice}
+          maxSongs={maxSongs}
+        />
       )}
 
       {pendingDelete && (
-        <div
-          className={styles.deleteOverlay}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setPendingDelete(null);
-          }}
-        >
-          <div className={styles.deleteModal} role="dialog" aria-modal="true">
-            <h3 className={styles.deleteTitle}>Remove source?</h3>
-            <p className={styles.deleteText}>
-              This will remove <strong>{pendingDelete.name}</strong> from your
-              library.
-            </p>
-            <div className={styles.deleteActions}>
-              <button
-                type="button"
-                className={styles.deleteCancelBtn}
-                onClick={() => setPendingDelete(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={styles.deleteConfirmBtn}
-                onClick={() => void confirmDelete()}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
+        <RemoveSourceModal
+          source={pendingDelete}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={confirmDelete}
+        />
       )}
     </div>
   );

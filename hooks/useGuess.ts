@@ -1,6 +1,7 @@
 'use client';
 
 import { useGame } from '@/contexts/GameContext';
+import { guessesReferToSameSong } from '@/lib/gameLogic';
 import { useCallback, useState } from 'react';
 
 interface UseGuessReturn {
@@ -9,6 +10,7 @@ interface UseGuessReturn {
   submit: () => void;
   skip: () => void;
   isSubmitting: boolean;
+  isDuplicateGuess: boolean;
   canSubmit: boolean;
   canSkip: boolean;
 }
@@ -18,12 +20,21 @@ export function useGuess(): UseGuessReturn {
   const [inputValue, setInputValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const MAX_GUESSES = 6;
+  const trimmedValue = inputValue.trim();
+
+  const isDuplicateGuess =
+    trimmedValue.length > 0 &&
+    !!currentRound &&
+    currentRound.guesses.some(
+      (guess) => guess.text && guessesReferToSameSong(guess.text, trimmedValue),
+    );
 
   const canSubmit =
-    inputValue.trim().length > 0 &&
+    trimmedValue.length > 0 &&
     !!currentRound &&
     !currentRound.completed &&
-    gameState?.status === 'playing';
+    gameState?.status === 'playing' &&
+    !isDuplicateGuess;
 
   const canSkip =
     !!currentRound &&
@@ -32,12 +43,12 @@ export function useGuess(): UseGuessReturn {
     currentRound.guesses.length < MAX_GUESSES;
 
   const submit = useCallback(() => {
-    if (!canSubmit) return;
+    if (!canSubmit || isDuplicateGuess) return;
     setIsSubmitting(true);
-    submitGuess(inputValue.trim());
+    submitGuess(trimmedValue);
     setInputValue('');
     setIsSubmitting(false);
-  }, [canSubmit, submitGuess, inputValue]);
+  }, [canSubmit, isDuplicateGuess, submitGuess, trimmedValue]);
 
   const skip = useCallback(() => {
     if (!canSkip) return;
@@ -50,6 +61,7 @@ export function useGuess(): UseGuessReturn {
     submit,
     skip,
     isSubmitting,
+    isDuplicateGuess,
     canSubmit,
     canSkip,
   };

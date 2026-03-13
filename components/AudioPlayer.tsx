@@ -1,142 +1,59 @@
 'use client';
 
-import { useEffect } from 'react';
-import { AlertTriangle, Pause, Play, Volume2 } from 'lucide-react';
-import { useAudio } from '@/hooks/useAudio';
-import styles from './AudioPlayer.module.css';
-
 interface AudioPlayerProps {
-  previewUrl: string;
   albumArt: string;
-  songTitle: string;
-  artistName: string;
   attemptsUsed?: number;
   difficultyMode: 'easy' | 'hard';
 }
 
 export default function AudioPlayer({
-  previewUrl,
   albumArt,
-  songTitle,
-  artistName,
   attemptsUsed = 0,
   difficultyMode,
 }: AudioPlayerProps) {
-  const audio = useAudio(previewUrl);
   const isEasyMode = difficultyMode === 'easy';
+  if (!isEasyMode) return null;
+
   const revealProgress = Math.min(1, Math.max(0, attemptsUsed / 6));
-  const blurPx = isEasyMode ? Math.max(0, 26 - revealProgress * 24) : 28;
-
-  useEffect(() => {
-    if (previewUrl) {
-      audio.loadUrl(previewUrl);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewUrl]);
-
-  const progressPercent =
-    audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0;
-  const hasPreview = Boolean(previewUrl);
+  const blurPx = Math.max(0, 30 - revealProgress * 26);
 
   return (
-    <div className={styles.player}>
-      <div className={styles.albumArt}>
-        {albumArt && isEasyMode ? (
+    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+          Album Cover
+        </span>
+        <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-sm font-semibold text-emerald-300">
+          Easy Mode
+        </span>
+      </div>
+
+      <div className="relative mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-xl bg-[var(--color-surface-2)]">
+        {albumArt ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={albumArt}
-            alt=""
-            aria-hidden="true"
+            alt="Album cover hint"
             draggable={false}
             onDragStart={(e) => e.preventDefault()}
             onContextMenu={(e) => e.preventDefault()}
-            className={styles.albumImage}
+            className="h-full w-full object-cover"
             style={{ filter: `blur(${blurPx}px)` }}
           />
         ) : (
-          <div className={styles.albumPlaceholder}>
-            {isEasyMode ? '🎵' : '🔒'}
-          </div>
-        )}
-        {albumArt && isEasyMode && (
-          <div
-            className={styles.blurredBg}
-            style={{ backgroundImage: `url(${albumArt})` }}
-          />
-        )}
-      </div>
-
-      <div className={styles.controls}>
-        <div className={styles.songInfo}>
-          <span className={styles.songTitle}>
-            {'?'.repeat(Math.min(songTitle.length, 15))}
-          </span>
-          <span className={styles.artistName}>
-            {'?'.repeat(Math.min(artistName.length, 12))}
-          </span>
-        </div>
-
-        <div className={styles.transport}>
-          <button
-            className={styles.playBtn}
-            onClick={audio.toggle}
-            disabled={!hasPreview || (!audio.isLoaded && !audio.isError)}
-            aria-label={audio.isPlaying ? 'Pause' : 'Play'}
-          >
-            {audio.isError ? (
-              <AlertTriangle size={16} />
-            ) : audio.isPlaying ? (
-              <Pause size={16} />
-            ) : (
-              <Play size={16} />
-            )}
-          </button>
-
-          <div className={styles.progressWrapper}>
-            <div className={styles.progressBar}>
-              <div
-                className={styles.progressFill}
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <div className={styles.timeInfo}>
-              <span>{formatTime(audio.currentTime)}</span>
-              <span>{formatTime(audio.duration)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.volume}>
-          <span className={styles.volumeIcon}>
-            <Volume2 size={14} />
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={audio.volume}
-            onChange={(e) => audio.setVolume(parseFloat(e.target.value))}
-            className={styles.volumeSlider}
-            aria-label="Volume"
-          />
-        </div>
-
-        {!hasPreview && (
-          <div className={styles.sourceFallback}>
-            <p className={styles.sourceNote}>
-              No anonymous audio preview is available for this track.
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-[var(--color-text-muted)]">
+            <p className="text-sm font-medium">
+              No album cover available for this track.
             </p>
           </div>
         )}
       </div>
+
+      {albumArt && (
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+          Cover reveals more after each guess or skip.
+        </p>
+      )}
     </div>
   );
-}
-
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return '0:00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
 }

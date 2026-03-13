@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Lyricle — Guess the Song',
+  title: 'ToBeNamed — Guess the Song',
   description:
     'A single-player lyrics guessing game powered by Spotify previews',
 };
@@ -29,7 +29,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable}`}
+        suppressHydrationWarning
+      >
         <SettingsProvider>
           <PlaylistProvider>
             <GameProvider>

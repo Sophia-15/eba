@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* =====================================================
    CSS Variables — Dark Theme
    ===================================================== */
@@ -34,15 +36,25 @@
 /* =====================================================
    Reset & Base
    ===================================================== */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+@layer 
+base
+ {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
 
-html {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
   font-size: 16px;
+  font-family:sans-serif;
+  color: #333;
   -webkit-text-size-adjust: 100%;
+  }
 }
 
 body {
@@ -62,42 +74,20 @@ a {
 
 a:hover { text-decoration: underline; }
 
+.app-header a,
+.app-header a:hover {
+  text-decoration: none;
+}
+
 button {
   font-family: inherit;
+  cursor: pointer;
+  border: none;
 }
 
 img, video {
   max-width: 100%;
   height: auto;
-}
-
-/* =====================================================
-   App Layout
-   ===================================================== */
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-.main-content {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.play-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  padding: 2rem;
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: 1rem;
-}
-
-.play-empty strong {
-  color: var(--color-accent);
 }
 
 /* =====================================================
@@ -135,3 +125,5 @@ img, video {
   white-space: nowrap;
   border-width: 0;
 }
+
+

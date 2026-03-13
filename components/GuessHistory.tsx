@@ -2,7 +2,6 @@
 
 import type { Guess } from '@/types/game';
 import { GuessResult } from '@/types/game';
-import styles from './GuessHistory.module.css';
 
 interface GuessHistoryProps {
   guesses: Guess[];
@@ -10,13 +9,21 @@ interface GuessHistoryProps {
 
 export default function GuessHistory({ guesses }: GuessHistoryProps) {
   return (
-    <div className={styles.container}>
+    <div className="grid gap-2">
       {guesses.map((guess) => (
         <div
           key={guess.id}
-          className={`${styles.slot} ${styles[guess.result]}`}
+          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-md ${
+            guess.result === GuessResult.CORRECT
+              ? 'border-emerald-500/40 bg-emerald-500/10'
+              : guess.result === GuessResult.PARTIAL
+                ? 'border-amber-500/40 bg-amber-500/10'
+                : guess.result === GuessResult.SKIPPED
+                  ? 'border-slate-500/40 bg-slate-500/10'
+                  : 'border-red-500/40 bg-red-500/10'
+          }`}
         >
-          <span className={styles.icon}>
+          <span>
             {guess.result === GuessResult.CORRECT
               ? '✅'
               : guess.result === GuessResult.PARTIAL
@@ -25,7 +32,7 @@ export default function GuessHistory({ guesses }: GuessHistoryProps) {
                   ? '⏭'
                   : '❌'}
           </span>
-          <span className={styles.text}>
+          <span className="text-[var(--color-text)]">
             {guess.result === GuessResult.SKIPPED
               ? 'Skipped'
               : guess.text || '—'}

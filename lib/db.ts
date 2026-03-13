@@ -7,7 +7,7 @@ import type {
 } from '@/types/storage';
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-export interface LyricleDB extends DBSchema {
+export interface ToBeNamedDB extends DBSchema {
   sources: {
     key: string;
     value: StoredSource;
@@ -47,14 +47,14 @@ export interface LyricleDB extends DBSchema {
   };
 }
 
-const DB_NAME = 'lyricle-db';
+const DB_NAME = 'tobenamed-db';
 const DB_VERSION = 2;
 
-let dbPromise: Promise<IDBPDatabase<LyricleDB>> | null = null;
+let dbPromise: Promise<IDBPDatabase<ToBeNamedDB>> | null = null;
 
-export function getDB(): Promise<IDBPDatabase<LyricleDB>> {
+export function getDB(): Promise<IDBPDatabase<ToBeNamedDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<LyricleDB>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<ToBeNamedDB>(DB_NAME, DB_VERSION, {
       upgrade(db) {
         // Sources store
         if (!db.objectStoreNames.contains('sources')) {

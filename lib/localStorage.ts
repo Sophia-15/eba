@@ -14,7 +14,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   maxGuesses: 6,
 };
 
-const PREFS_KEY = 'lyricle-preferences';
+const PREFS_KEY = 'tobenamed-preferences';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';

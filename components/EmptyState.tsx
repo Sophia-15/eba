@@ -1,7 +1,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import styles from './EmptyState.module.css';
 
 interface EmptyStateProps {
   icon?: ReactNode;
@@ -20,12 +19,21 @@ export default function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className={styles.container}>
-      {icon ? <span className={styles.icon}>{icon}</span> : null}
-      <h3 className={styles.title}>{title}</h3>
-      {description && <p className={styles.description}>{description}</p>}
+    <div className="mx-auto flex w-full max-w-xl flex-col items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8 text-center">
+      {icon ? <span className="mb-3 text-3xl">{icon}</span> : null}
+      <h3 className="mb-2 text-xl font-semibold text-[var(--color-text)]">
+        {title}
+      </h3>
+      {description && (
+        <p className="mb-5 text-md text-[var(--color-text-muted)]">
+          {description}
+        </p>
+      )}
       {action && (
-        <button className={styles.action} onClick={action.onClick}>
+        <button
+          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-md font-semibold text-white transition hover:brightness-110"
+          onClick={action.onClick}
+        >
           {action.label}
         </button>
       )}

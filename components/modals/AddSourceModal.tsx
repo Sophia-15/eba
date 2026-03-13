@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Disc3, ListMusic, Search, X } from 'lucide-react';
 import { searchSpotify, getAlbum, getPlaylist } from '@/lib/spotifyService';
-import styles from './AddSourceModal.module.css';
 
 interface SearchResult {
   id: string;
@@ -60,27 +59,27 @@ export default function AddSourceModal({
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  const latestSearchIdRef = useRef(0);
 
-  async function onSearch(e: FormEvent) {
-    e.preventDefault();
-    if (!query.trim()) return;
+  async function runSearch(rawQuery: string) {
+    const trimmedQuery = rawQuery.trim();
+    if (!trimmedQuery) {
+      setResults([]);
+      setError(null);
+      setIsSearching(false);
+      return;
+    }
+
+    const searchId = ++latestSearchIdRef.current;
     setIsSearching(true);
     setError(null);
-    setResults([]);
 
     try {
-      // Handle Spotify URLs directly
-      // Supports:
-      // - https://open.spotify.com/album/ID
-      // - https://open.spotify.com/playlist/ID
-      // - open.spotify.com/album/ID
-      // - spotify:album:ID
-      const urlMatch = query.match(
+      const urlMatch = trimmedQuery.match(
         /(?:open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(album|playlist)\/|spotify:(album|playlist):)([a-zA-Z0-9]+)/,
       );
 
       if (urlMatch) {
-        // Group 1 or 2 is type, Group 3 is ID
         const type = (urlMatch[1] || urlMatch[2]) as 'album' | 'playlist';
         const id = urlMatch[3];
 
@@ -122,10 +121,10 @@ export default function AddSourceModal({
         return;
       }
 
-      const data = await searchSpotify(query, 'playlist,album', 30);
+      const data = await searchSpotify(trimmedQuery, 'playlist,album', 12);
 
       const playlists: SearchResult[] = (data.playlists?.items ?? [])
-        .filter((p: unknown) => p) // Safety check
+        .filter((p: unknown) => p)
         .map(
           (p: {
             id: string;
@@ -144,7 +143,7 @@ export default function AddSourceModal({
         );
 
       const albums: SearchResult[] = (data.albums?.items ?? [])
-        .filter((a: unknown) => a) // Safety check
+        .filter((a: unknown) => a)
         .map(
           (a: {
             id: string;
@@ -164,24 +163,47 @@ export default function AddSourceModal({
 
       const combined = [...playlists, ...albums];
       const ranked = combined
-        .map((item) => ({ item, score: scoreMatch(item, query) }))
+        .map((item) => ({ item, score: scoreMatch(item, trimmedQuery) }))
         .sort((a, b) => b.score - a.score)
         .map(({ item }) => item);
 
       const strictMatches = ranked.filter(
-        (item) => scoreMatch(item, query) > 0,
+        (item) => scoreMatch(item, trimmedQuery) > 0,
       );
+
+      if (searchId !== latestSearchIdRef.current) return;
 
       setResults(
         (strictMatches.length > 0 ? strictMatches : ranked).slice(0, 12),
       );
     } catch (err) {
+      if (searchId !== latestSearchIdRef.current) return;
       console.error('Search error:', err);
       setError('Search failed. Check console for details.');
     } finally {
-      setIsSearching(false);
+      if (searchId === latestSearchIdRef.current) {
+        setIsSearching(false);
+      }
     }
   }
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      latestSearchIdRef.current += 1;
+      setResults([]);
+      setError(null);
+      setIsSearching(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void runSearch(query);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   async function handleAdd(result: SearchResult) {
     setAdding(result.id);
@@ -195,69 +217,75 @@ export default function AddSourceModal({
 
   return (
     <div
-      className={styles.overlay}
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className={styles.modal}
+        className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="Add music source"
       >
-        <div className={styles.header}>
-          <h2 className={styles.title}>Add Playlist or Album</h2>
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-5">
+          <h2 className="text-2xl font-semibold">Add Playlist or Album</h2>
           <button
-            className={styles.closeBtn}
+            className="rounded-xl p-3 text-[var(--color-text-muted)] hover:bg-[var(--color-surface-2)]"
             onClick={onClose}
             aria-label="Close"
           >
-            <X size={16} />
+            <X size={20} />
           </button>
         </div>
 
-        <form className={styles.searchForm} onSubmit={onSearch}>
-          <input
-            className={styles.searchInput}
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search Spotify..."
-            autoFocus
-          />
-          <button
-            type="submit"
-            className={styles.searchBtn}
-            disabled={isSearching}
-          >
-            {isSearching ? '...' : <Search size={16} />}
-          </button>
-        </form>
+        <div className="px-6 pb-3 pt-5">
+          <div className="relative">
+            <Search
+              size={20}
+              className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
+            />
+            <input
+              className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-2)] py-4 pl-14 pr-5 text-lg outline-none focus:ring-2 focus:ring-[var(--color-accent)]/40"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search Spotify playlists or albums..."
+              autoFocus
+            />
+          </div>
+          <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+            Results appear automatically as you type.
+            {isSearching ? ' Searching…' : ''}
+          </p>
+        </div>
 
-        {error && <p className={styles.error}>{error}</p>}
+        {error && <p className="px-6 pb-2 text-base text-red-300">{error}</p>}
 
-        <div className={styles.results}>
+        <div className="max-h-[62vh] space-y-3 overflow-y-auto px-6 pb-6">
           {results.map((result) => (
-            <div key={`${result.type}-${result.id}`} className={styles.result}>
+            <div
+              key={`${result.type}-${result.id}`}
+              className="flex items-center gap-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4"
+            >
               {result.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={result.imageUrl}
                   alt={result.name}
-                  className={styles.resultImage}
+                  className="h-20 w-20 rounded-xl object-cover"
                 />
               ) : (
-                <div className={styles.resultImagePlaceholder}>
+                <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-[var(--color-surface)] text-[var(--color-text-muted)]">
                   {result.type === 'playlist' ? (
-                    <ListMusic size={22} />
+                    <ListMusic size={30} />
                   ) : (
-                    <Disc3 size={22} />
+                    <Disc3 size={30} />
                   )}
                 </div>
               )}
-              <div className={styles.resultInfo}>
-                <p className={styles.resultName}>{result.name}</p>
-                <p className={styles.resultMeta}>
-                  <span className={styles.resultType}>{result.type}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-semibold">{result.name}</p>
+                <p className="truncate text-sm text-[var(--color-text-muted)]">
+                  <span className="uppercase">{result.type}</span>
                   {' · '}
                   {result.ownerOrArtist}
                   {' · '}
@@ -265,7 +293,7 @@ export default function AddSourceModal({
                 </p>
               </div>
               <button
-                className={styles.addBtn}
+                className="rounded-xl bg-[var(--color-accent)] px-5 py-3 text-base font-semibold text-white disabled:opacity-50"
                 onClick={() => handleAdd(result)}
                 disabled={adding === result.id}
               >
@@ -274,16 +302,16 @@ export default function AddSourceModal({
             </div>
           ))}
 
-          {results.length === 0 && !isSearching && query && !error && (
-            <p className={styles.noResults}>
-              No results found. Try a different search term.
+          {results.length === 0 && !query && (
+            <p className="py-10 text-center text-base text-[var(--color-text-muted)]">
+              Search for any playlist or album on Spotify to add it to your
+              library.
             </p>
           )}
 
-          {results.length === 0 && !query && (
-            <p className={styles.hint}>
-              Search for any playlist or album on Spotify to add it to your
-              library.
+          {results.length === 0 && query.trim() && !isSearching && !error && (
+            <p className="py-10 text-center text-base text-[var(--color-text-muted)]">
+              No playlists or albums matched your search.
             </p>
           )}
         </div>

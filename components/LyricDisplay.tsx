@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import type { LyricSnippet } from '@/types/game';
-import styles from './LyricDisplay.module.css';
 
 interface LyricDisplayProps {
   snippets: LyricSnippet[];
@@ -20,8 +19,8 @@ export default function LyricDisplay({
 
   if (snippets.length === 0) {
     return (
-      <div className={styles.container}>
-        <p className={styles.placeholder}>
+      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <p className="text-lg text-[var(--color-text-muted)]">
           {lyricsStatus === 'loading' || lyricsStatus === 'pending'
             ? 'Loading lyrics for this song...'
             : 'No lyrics available for this song.'}
@@ -31,9 +30,9 @@ export default function LyricDisplay({
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <span className={styles.hintLabel}>
+    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
           Hint {visibleCount} / {snippets.length}
         </span>
         <DifficultyBadge
@@ -41,7 +40,7 @@ export default function LyricDisplay({
         />
       </div>
 
-      <div className={styles.snippets}>
+      <div className="grid gap-2">
         {visibleSnippets.map((snippet, i) => (
           <SnippetCard
             key={snippet.id}
@@ -72,10 +71,12 @@ function SnippetCard({
 
   return (
     <div
-      className={`${styles.snippet} ${visible ? styles.visible : ''} ${isNew ? styles.newest : ''}`}
+      className={`rounded-lg border-l-4 border-[var(--color-accent)]/70 bg-[var(--color-surface-2)] p-3 transition ${
+        visible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
+      }`}
     >
       {snippet.lines.map((line, i) => (
-        <p key={i} className={styles.line}>
+        <p key={i} className="text-lg leading-6 text-[var(--color-text)]">
           {line}
         </p>
       ))}
@@ -90,7 +91,15 @@ function DifficultyBadge({
 }) {
   if (!difficulty) return null;
   return (
-    <span className={`${styles.badge} ${styles[difficulty]}`}>
+    <span
+      className={`rounded-full px-2 py-1 text-xs font-semibold ${
+        difficulty === 'hard'
+          ? 'bg-red-500/20 text-red-300'
+          : difficulty === 'medium'
+            ? 'bg-amber-500/20 text-amber-300'
+            : 'bg-emerald-500/20 text-emerald-300'
+      }`}
+    >
       {difficulty === 'hard' ? '🔥' : difficulty === 'medium' ? '⚡' : '✨'}{' '}
       {difficulty}
     </span>

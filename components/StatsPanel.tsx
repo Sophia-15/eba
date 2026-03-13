@@ -6,8 +6,8 @@ import { useIndexedDB } from '@/hooks/useIndexedDB';
 import type { StoredStatistics, StoredGameHistory } from '@/types/storage';
 import LoadingSpinner from './LoadingSpinner';
 import EmptyState from './EmptyState';
+import GameDetailsModal from './modals/GameDetailsModal';
 import { GuessResult } from '@/types/game';
-import styles from './StatsPanel.module.css';
 
 export default function StatsPanel() {
   const fetchStats = useCallback(() => getStatistics(), []);
@@ -23,10 +23,6 @@ export default function StatsPanel() {
   );
 
   const lastGame = history?.[0] ?? null;
-  const globalAccuracy =
-    stats && stats.totalRounds > 0
-      ? Math.round((stats.correctGuesses / stats.totalRounds) * 100)
-      : 0;
   const lastGameSummary = useMemo(() => {
     if (!lastGame) return null;
     const correct = lastGame.rounds.filter((r) =>
@@ -45,7 +41,7 @@ export default function StatsPanel() {
 
   if (statsLoading || historyLoading) {
     return (
-      <div className={styles.centered}>
+      <div className="flex min-h-[50vh] items-center justify-center">
         <LoadingSpinner label="Loading stats..." />
       </div>
     );
@@ -53,21 +49,25 @@ export default function StatsPanel() {
 
   if (!stats || stats.totalGames === 0) {
     return (
-      <EmptyState
-        icon="📊"
-        title="No stats yet"
-        description="Complete a game session to see your statistics here!"
-      />
+      <div className="mt-8">
+        <EmptyState
+          icon="📊"
+          title="No stats yet"
+          description="Complete a game session to see your statistics here!"
+        />
+      </div>
     );
   }
 
   return (
-    <div className={styles.container}>
-      <h2 className={styles.heading}>Statistics</h2>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+      <h2 className="text-2xl font-black">Statistics</h2>
 
-      <section className={styles.section}>
-        <p className={styles.sectionLabel}>Global (all games)</p>
-        <div className={styles.statsGrid}>
+      <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <p className="mb-3 text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+          Global (all games)
+        </p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <StatCard
             label="Games Played"
             value={stats.totalGames.toString()}
@@ -86,9 +86,11 @@ export default function StatsPanel() {
         </div>
       </section>
 
-      <section className={styles.section}>
-        <p className={styles.sectionLabel}>Last game</p>
-        <div className={styles.statsGrid}>
+      <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <p className="mb-3 text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+          Last game
+        </p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard
             label="Score"
             value={
@@ -120,9 +122,9 @@ export default function StatsPanel() {
       </section>
 
       {history && history.length > 0 && (
-        <div className={styles.history}>
-          <h3 className={styles.subheading}>Recent Games</h3>
-          <div className={styles.historyList}>
+        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <h3 className="mb-3 text-lg font-semibold">Recent Games</h3>
+          <div className="space-y-2">
             {history.map((game) => {
               const correct = game.rounds.filter((r) =>
                 r.guesses.some((g) => g.result === GuessResult.CORRECT),
@@ -130,23 +132,23 @@ export default function StatsPanel() {
               return (
                 <button
                   key={game.id}
-                  className={styles.historyRow}
+                  className="flex w-full items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-left"
                   onClick={() => setSelectedGame(game)}
                   type="button"
                 >
-                  <span className={styles.historyLeft}>
-                    <span className={styles.historyPlaylist}>
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">
                       {game.playlistName}
                     </span>
-                    <span className={styles.historyDate}>
+                    <span className="text-xs text-[var(--color-text-muted)]">
                       {formatDate(game.startedAt)}
                     </span>
                   </span>
-                  <span className={styles.historyRight}>
-                    <span className={styles.historyResult}>
+                  <span className="text-right">
+                    <span className="block text-md font-semibold">
                       {correct}/{game.rounds.length}
                     </span>
-                    <span className={styles.historyScore}>
+                    <span className="text-xs text-[var(--color-text-muted)]">
                       {game.totalScore.toLocaleString()} pts
                     </span>
                   </span>
@@ -158,65 +160,10 @@ export default function StatsPanel() {
       )}
 
       {selectedGame && (
-        <div
-          className={styles.modalOverlay}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedGame(null);
-          }}
-        >
-          <div className={styles.modal} role="dialog" aria-modal="true">
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>{selectedGame.playlistName}</h3>
-              <button
-                className={styles.modalClose}
-                onClick={() => setSelectedGame(null)}
-                type="button"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className={styles.modalStats}>
-              <p>
-                <strong>Date:</strong> {formatDate(selectedGame.startedAt)}
-              </p>
-              <p>
-                <strong>Total score:</strong>{' '}
-                {selectedGame.totalScore.toLocaleString()}
-              </p>
-              <p>
-                <strong>Correct songs:</strong>{' '}
-                {
-                  selectedGame.rounds.filter((r) =>
-                    r.guesses.some((g) => g.result === GuessResult.CORRECT),
-                  ).length
-                }
-                /{selectedGame.rounds.length}
-              </p>
-              <p>
-                <strong>Mode:</strong>{' '}
-                {(selectedGame.difficultyMode ?? 'hard').toUpperCase()}
-              </p>
-            </div>
-
-            <div className={styles.modalRounds}>
-              {selectedGame.rounds.map((round, index) => {
-                const won = round.guesses.some(
-                  (g) => g.result === GuessResult.CORRECT,
-                );
-                return (
-                  <div key={round.songId} className={styles.roundRow}>
-                    <span className={styles.roundNumber}>#{index + 1}</span>
-                    <span className={styles.roundTitle}>{round.songTitle}</span>
-                    <span className={styles.roundState}>
-                      {won ? '✅' : '❌'} {won ? `+${round.score}` : '0'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <GameDetailsModal
+          game={selectedGame}
+          onClose={() => setSelectedGame(null)}
+        />
       )}
     </div>
   );
@@ -234,10 +181,18 @@ function StatCard({
   highlight?: boolean;
 }) {
   return (
-    <div className={`${styles.statCard} ${highlight ? styles.highlight : ''}`}>
-      <span className={styles.statIcon}>{icon}</span>
-      <span className={styles.statValue}>{value}</span>
-      <span className={styles.statLabel}>{label}</span>
+    <div
+      className={`rounded-xl border p-3 ${
+        highlight
+          ? 'border-[var(--color-accent)]/40 bg-[var(--color-accent-subtle)]'
+          : 'border-[var(--color-border)] bg-[var(--color-surface-2)]'
+      }`}
+    >
+      <span className="mb-1 block text-lg">{icon}</span>
+      <span className="block text-lg font-bold">{value}</span>
+      <span className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+        {label}
+      </span>
     </div>
   );
 }
