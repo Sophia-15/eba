@@ -4,7 +4,6 @@ import { AlertTriangle, ArrowLeft, Trophy } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import LyricDisplay from './LyricDisplay';
 import GuessInput from './GuessInput';
-import GuessHistory from './GuessHistory';
 import RoundResult from './RoundResult';
 import GameOver from './GameOver';
 import LoadingSpinner from './LoadingSpinner';
@@ -92,6 +91,9 @@ export default function GameBoard({ onExit }: GameBoardProps) {
       {gameState.difficultyMode === 'easy' && (
         <AudioPlayer
           albumArt={currentRound.albumArt}
+          previewUrl={currentRound.previewUrl}
+          songTitle={currentRound.songTitle}
+          artistName={currentRound.artistName}
           attemptsUsed={currentRound.guesses.length}
           difficultyMode={gameState.difficultyMode}
         />
@@ -102,7 +104,6 @@ export default function GameBoard({ onExit }: GameBoardProps) {
         revealedCount={currentRound.hintsRevealed}
         lyricsStatus={currentRound.lyricsStatus}
       />
-      <GuessHistory guesses={currentRound.guesses} />
 
       <GuessInput attemptsUsed={currentRound.guesses.length} />
     </div>

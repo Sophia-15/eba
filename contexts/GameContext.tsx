@@ -12,6 +12,7 @@ import {
 import type { GameState, GameRound } from '@/types/game';
 import type { StoredSong } from '@/types/storage';
 import { GameMode, GuessResult } from '@/types/game';
+import { getDeezerPreview } from '@/lib/deezerService';
 import { getLyricsBySongId, getSong } from '@/lib/storage';
 import { fetchLyricsForSong } from '@/lib/lyricsService';
 import { selectLyricSnippets } from '@/lib/lyricProcessor';
@@ -122,6 +123,76 @@ export function GameProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const hydrateRoundPreview = useCallback(
+    async (round: GameRound): Promise<GameRound> => {
+      if (round.previewUrl) {
+        return round;
+      }
+
+      try {
+        const previewUrl = await getDeezerPreview(
+          round.songTitle,
+          round.artistName,
+        );
+        return {
+          ...round,
+          previewUrl,
+        };
+      } catch (err) {
+        console.error('Failed to hydrate round preview:', err);
+        return round;
+      }
+    },
+    [],
+  );
+
+  const buildRoundFromSong = useCallback(
+    (song: StoredSong): GameRound => ({
+      songId: song.id,
+      spotifyId: song.spotifyId,
+      songTitle: song.title,
+      artistName: song.artistName,
+      albumName: song.albumName,
+      previewUrl: song.previewUrl,
+      albumArt: song.albumArt,
+      durationMs: song.durationMs,
+      lyricsStatus: 'pending',
+      lyrics: '',
+      snippets: [],
+      guesses: [],
+      hintsRevealed: 0,
+      score: 0,
+      completed: false,
+      startedAt: Date.now(),
+    }),
+    [],
+  );
+
+  const finalizeGame = useCallback((state: GameState): GameState => {
+    const completedGame: GameState = {
+      ...state,
+      status: 'game_over',
+      completedAt: Date.now(),
+    };
+
+    saveGameHistory({ ...completedGame, savedAt: Date.now() }).catch(
+      console.error,
+    );
+    updateStatistics({
+      totalGames: 1,
+      totalRounds: completedGame.rounds.length,
+      totalScore: completedGame.totalScore,
+      correctGuesses: completedGame.rounds.filter((r) =>
+        r.guesses.some((g) => g.result === GuessResult.CORRECT),
+      ).length,
+      incorrectGuesses: completedGame.rounds.filter(
+        (r) => r.completed && r.score === 0,
+      ).length,
+    }).catch(console.error);
+
+    return completedGame;
+  }, []);
+
   const startGame = useCallback(
     async (
       sourceId: string,
@@ -146,31 +217,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
           1,
           Math.min(50, Math.floor(trackCount)),
         );
-        const shuffled = shuffleSongs(songs).slice(0, normalizedTrackCount);
-
-        const rounds: GameRound[] = shuffled.map(
-          (song): GameRound => ({
-            songId: song.id,
-            spotifyId: song.spotifyId,
-            songTitle: song.title,
-            artistName: song.artistName,
-            albumName: song.albumName,
-            previewUrl: song.previewUrl,
-            albumArt: song.albumArt,
-            durationMs: song.durationMs,
-            lyricsStatus: 'pending',
-            lyrics: '',
-            snippets: [],
-            guesses: [],
-            hintsRevealed: 0,
-            score: 0,
-            completed: false,
-            startedAt: Date.now(),
-          }),
+        const playableSongs = songs.filter(
+          (song) =>
+            song.lyricsStatus !== 'failed' &&
+            song.lyricsStatus !== 'unavailable',
         );
+        const rounds = shuffleSongs(playableSongs)
+          .slice(0, normalizedTrackCount)
+          .map(buildRoundFromSong);
 
-        if (rounds.length > 0) {
-          rounds[0] = await hydrateRoundLyrics(rounds[0]);
+        if (rounds.length === 0) {
+          const msg =
+            'No songs ready for play were found for this source. Try syncing lyrics first.';
+          setError(msg);
+          throw new Error(msg);
         }
 
         const newGame: GameState = {
@@ -199,7 +259,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     },
-    [hydrateRoundLyrics],
+    [buildRoundFromSong],
   );
 
   const submitGuess = useCallback((text: string) => {
@@ -306,61 +366,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setGameState((prev) => {
         if (!prev || prev.currentRoundIndex !== currentRoundIndex) return prev;
 
-        const completedGame: GameState = {
-          ...prev,
-          status: 'game_over',
-          completedAt: Date.now(),
-        };
-
-        // Save to history asynchronously
-        saveGameHistory({ ...completedGame, savedAt: Date.now() }).catch(
-          console.error,
-        );
-        updateStatistics({
-          totalGames: 1,
-          totalRounds: prev.rounds.length,
-          totalScore: prev.totalScore,
-          correctGuesses: prev.rounds.filter((r) =>
-            r.guesses.some((g) => g.result === GuessResult.CORRECT),
-          ).length,
-          incorrectGuesses: prev.rounds.filter(
-            (r) => r.completed && r.score === 0,
-          ).length,
-        }).catch(console.error);
-
-        return completedGame;
+        return finalizeGame(prev);
       });
       return;
     }
 
-    const roundToHydrate = gameState.rounds[nextIndex];
-    if (!roundToHydrate) return;
+    setGameState((prev) => {
+      if (!prev || prev.currentRoundIndex !== currentRoundIndex) return prev;
 
-    setIsLoading(true);
-
-    try {
-      const hydratedRound = await hydrateRoundLyrics({
-        ...roundToHydrate,
-        lyricsStatus: 'loading',
-      });
-
-      setGameState((prev) => {
-        if (!prev || prev.currentRoundIndex !== currentRoundIndex) return prev;
-
-        const updatedRounds = [...prev.rounds];
-        updatedRounds[nextIndex] = hydratedRound;
-
-        return {
-          ...prev,
-          currentRoundIndex: nextIndex,
-          status: 'playing',
-          rounds: updatedRounds,
-        };
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [gameState, hydrateRoundLyrics]);
+      return {
+        ...prev,
+        currentRoundIndex: nextIndex,
+        status: 'playing',
+      };
+    });
+  }, [finalizeGame, gameState]);
 
   useEffect(() => {
     if (!gameState || !currentRound) return;
@@ -382,8 +402,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     void hydrateRoundLyrics({ ...currentRound, lyricsStatus: 'loading' })
+      .then((hydratedLyricsRound) => {
+        if (cancelled) return null;
+
+        if (gameState.difficultyMode !== 'easy') {
+          return hydratedLyricsRound;
+        }
+
+        return hydrateRoundPreview(hydratedLyricsRound);
+      })
       .then((hydratedRound) => {
         if (cancelled) return;
+        if (!hydratedRound) return;
 
         setGameState((prev) => {
           if (!prev || prev.id !== gameState.id) return prev;
@@ -391,11 +421,41 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
           const latestRound = prev.rounds[roundIndex];
           if (!latestRound) return prev;
-          if (
-            latestRound.lyricsStatus === 'ready' ||
-            latestRound.lyricsStatus === 'unavailable'
-          ) {
+          if (latestRound.lyricsStatus === 'ready') {
             return prev;
+          }
+
+          const shouldRemoveRound =
+            hydratedRound.snippets.length === 0 ||
+            (prev.difficultyMode === 'easy' && !hydratedRound.previewUrl);
+
+          if (shouldRemoveRound) {
+            const updatedRounds = prev.rounds.filter(
+              (_, i) => i !== roundIndex,
+            );
+
+            if (updatedRounds.length === 0) {
+              setError(
+                prev.difficultyMode === 'easy'
+                  ? 'No songs with both audio and lyrics were found for easy mode.'
+                  : 'No songs with usable lyrics were found for this source. Try syncing lyrics first.',
+              );
+              return null;
+            }
+
+            if (roundIndex >= updatedRounds.length) {
+              return finalizeGame({
+                ...prev,
+                rounds: updatedRounds,
+                currentRoundIndex: Math.max(0, updatedRounds.length - 1),
+              });
+            }
+
+            return {
+              ...prev,
+              rounds: updatedRounds,
+              status: 'playing',
+            };
           }
 
           const updatedRounds = [...prev.rounds];
@@ -417,7 +477,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [currentRound, gameState, hydrateRoundLyrics]);
+  }, [
+    currentRound,
+    finalizeGame,
+    gameState,
+    hydrateRoundLyrics,
+    hydrateRoundPreview,
+  ]);
 
   const endGame = useCallback(() => {
     setGameState(null);

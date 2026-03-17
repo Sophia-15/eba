@@ -19,6 +19,7 @@ interface UseAudioReturn extends AudioState {
   setVolume: (v: number) => void;
   seek: (time: number) => void;
   loadUrl: (url: string) => void;
+  getTime: () => number;
 }
 
 export function useAudio(initialUrl?: string): UseAudioReturn {
@@ -68,9 +69,21 @@ export function useAudio(initialUrl?: string): UseAudioReturn {
     audio.addEventListener('error', onError);
     audio.addEventListener('timeupdate', onTimeUpdate);
 
+    setState((s) => ({
+      ...s,
+      isLoaded: false,
+      isError: false,
+      isPlaying: false,
+      currentTime: 0,
+      duration: 0,
+    }));
+
     if (initialUrl) {
       audio.src = initialUrl;
       audio.load();
+    } else {
+      audio.pause();
+      audio.src = '';
     }
 
     return () => {
@@ -143,5 +156,7 @@ export function useAudio(initialUrl?: string): UseAudioReturn {
     [getOrCreateAudio, preferences.autoPlay],
   );
 
-  return { ...state, play, pause, toggle, setVolume, seek, loadUrl };
+  const getTime = useCallback(() => audioRef.current?.currentTime ?? 0, []);
+
+  return { ...state, play, pause, toggle, setVolume, seek, loadUrl, getTime };
 }

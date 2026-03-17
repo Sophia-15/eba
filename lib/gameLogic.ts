@@ -36,16 +36,17 @@ export function splitGuessParts(input: string): {
   titlePart: string;
   artistPart: string;
 } {
-  const separators = [' - ', ' — ', ' – ', '-', '—', '–'];
+  // Only match spaced separators to avoid splitting within hyphenated titles (e.g. "Spider-Man").
+  const separators = [' - ', ' — ', ' – '];
   const found = separators.find((sep) => input.includes(sep));
   if (!found) {
     return { titlePart: input, artistPart: '' };
   }
 
-  const [titlePart, ...artistParts] = input.split(found);
+  const idx = input.indexOf(found);
   return {
-    titlePart: titlePart.trim(),
-    artistPart: artistParts.join(found).trim(),
+    titlePart: input.slice(0, idx).trim(),
+    artistPart: input.slice(idx + found.length).trim(),
   };
 }
 

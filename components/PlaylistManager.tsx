@@ -201,7 +201,7 @@ export default function PlaylistManager({ onStartGame }: PlaylistManagerProps) {
           }}
         />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,260px))] justify-start gap-5">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {sources.map((source) => (
             <PlaylistCard
               key={source.id}
