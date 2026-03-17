@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { LoaderCircle, Pause, Play, Volume2 } from 'lucide-react';
+import { LoaderCircle, Pause, Play } from 'lucide-react';
 import { getDeezerPreview } from '@/lib/deezerService';
 import { useAudio } from '@/hooks/useAudio';
 
 const BLUR_STEPS = [14, 10, 8, 6, 3, 1, 0];
-const HINT_DURATION_SECONDS = 6;
+const HINT_DURATION_SECONDS = 3;
 
 function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -135,49 +135,47 @@ export default function AudioPlayer({
     }
   }
 
-  if (!isEasyMode) return null;
-
-  const audioHintLabel = isFetchingPreview
-    ? 'Finding audio hint...'
-    : previewUnavailable || isError
-      ? 'Audio unavailable for this track.'
-      : isLoaded || canPlayPreview
-        ? '6-second audio hint'
-        : 'Audio unavailable.';
-
   return (
     <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-          Album Cover
+          {isEasyMode ? 'Album Cover + Audio Hint' : 'Audio Hint'}
         </span>
-        <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-sm font-semibold text-emerald-300">
-          Easy Mode
+        <span
+          className={`rounded-full px-2.5 py-1 text-sm font-semibold ${
+            isEasyMode
+              ? 'bg-emerald-500/20 text-emerald-300'
+              : 'bg-red-500/15 text-red-200'
+          }`}
+        >
+          {isEasyMode ? 'Easy Mode' : 'Hard Mode'}
         </span>
       </div>
 
-      <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-3">
-        <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-xl bg-[var(--color-surface-2)] shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
-          {albumArt ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={albumArt}
-              alt="Album cover hint"
-              draggable={false}
-              onDragStart={(e) => e.preventDefault()}
-              onContextMenu={(e) => e.preventDefault()}
-              className="h-full w-full object-cover"
-              style={{ filter: `blur(${blurPx}px)` }}
-            />
-          ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-[var(--color-text-muted)]">
-              <p className="text-sm font-medium">
-                No album cover available for this track.
-              </p>
-            </div>
-          )}
+      {isEasyMode && (
+        <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-3">
+          <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-xl bg-[var(--color-surface-2)] shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
+            {albumArt ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={albumArt}
+                alt="Album cover hint"
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
+                className="h-full w-full object-cover"
+                style={{ filter: `blur(${blurPx}px)` }}
+              />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-[var(--color-text-muted)]">
+                <p className="text-sm font-medium">
+                  No album cover available for this track.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-4 flex item-center gap-4 w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-[var(--color-text)] shadow-lg">
         <div className="w-full">

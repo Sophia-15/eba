@@ -118,7 +118,8 @@ export default function GameModeModal({
             </span>
             <span className="mb-1 text-lg font-semibold">Easy</span>
             <span className="text-md text-[var(--color-text-muted)]">
-              Cover is visible and gets clearer as guesses increase.
+              Cover is visible, gets clearer as guesses increase, and includes a
+              3-second audio hint.
             </span>
           </button>
           <button
@@ -134,7 +135,8 @@ export default function GameModeModal({
               Hard
             </span>
             <span className="text-md text-[var(--color-text-muted)]">
-              Cover stays hidden during the whole round.
+              Cover stays hidden during the whole round, but the 3-second audio
+              hint is still available.
             </span>
           </button>
         </div>

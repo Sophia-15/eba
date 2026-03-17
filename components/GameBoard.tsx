@@ -88,16 +88,14 @@ export default function GameBoard({ onExit }: GameBoardProps) {
         </div>
       </div>
 
-      {gameState.difficultyMode === 'easy' && (
-        <AudioPlayer
-          albumArt={currentRound.albumArt}
-          previewUrl={currentRound.previewUrl}
-          songTitle={currentRound.songTitle}
-          artistName={currentRound.artistName}
-          attemptsUsed={currentRound.guesses.length}
-          difficultyMode={gameState.difficultyMode}
-        />
-      )}
+      <AudioPlayer
+        albumArt={currentRound.albumArt}
+        previewUrl={currentRound.previewUrl}
+        songTitle={currentRound.songTitle}
+        artistName={currentRound.artistName}
+        attemptsUsed={currentRound.guesses.length}
+        difficultyMode={gameState.difficultyMode}
+      />
 
       <LyricDisplay
         snippets={currentRound.snippets}
