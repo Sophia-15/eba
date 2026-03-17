@@ -6,11 +6,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useGame } from '@/contexts/GameContext';
 import { usePlaylist } from '@/contexts/PlaylistContext';
 import { useGuess } from '@/hooks/useGuess';
-import {
-  guessesReferToSameSong,
-  normaliseForGuess,
-  splitGuessParts,
-} from '@/lib/gameLogic';
+import { guessesReferToSameSong } from '@/lib/gameLogic';
 import { GuessResult } from '@/types/game';
 import GuessHistory from './GuessHistory';
 
@@ -37,9 +33,6 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
   >([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [poolReady, setPoolReady] = useState(false);
-  const [showInvalidSelectionMessage, setShowInvalidSelectionMessage] =
-    useState(false);
 
   type Suggestion = {
     key: string;
@@ -77,12 +70,10 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
         }
 
         setSuggestionPool(Array.from(unique.values()));
-        setPoolReady(true);
       } catch (err) {
         if (!cancelled) {
           console.error('Failed to load suggestion pool:', err);
           setSuggestionPool([]);
-          setPoolReady(true);
         }
       }
     }
@@ -128,22 +119,6 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
       .slice(0, 6);
   }, [inputValue, suggestionPool]);
 
-  // Only allow submitting songs that actually exist in the pool.
-  const isMatchingPoolSong = useMemo(() => {
-    const q = inputValue.trim();
-    if (!q) return false;
-    // Don't block before the pool has loaded.
-    if (!poolReady || suggestionPool.length === 0) return true;
-    const { titlePart } = splitGuessParts(q);
-    const normalizedInput = normaliseForGuess(titlePart || q);
-    return (
-      normalizedInput.length > 0 &&
-      suggestionPool.some(
-        (song) => normaliseForGuess(song.title) === normalizedInput,
-      )
-    );
-  }, [inputValue, suggestionPool, poolReady]);
-
   const previousGuesses = useMemo(
     () =>
       (currentRound?.guesses ?? [])
@@ -155,11 +130,6 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (isDuplicateGuess) return;
-    if (!isMatchingPoolSong) {
-      setShowInvalidSelectionMessage(true);
-      return;
-    }
-    setShowInvalidSelectionMessage(false);
     setShowSuggestions(false);
     submit();
   }
@@ -170,12 +140,6 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
         e.preventDefault();
         return;
       }
-      if (!isMatchingPoolSong) {
-        e.preventDefault();
-        setShowInvalidSelectionMessage(true);
-        return;
-      }
-      setShowInvalidSelectionMessage(false);
       setShowSuggestions(false);
       submit();
     }
@@ -186,7 +150,6 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
 
   function handleSuggestionSelect(suggestion: Suggestion) {
     setInputValue(`${suggestion.title} - ${suggestion.artist}`);
-    setShowInvalidSelectionMessage(false);
     setShowSuggestions(false);
   }
 
@@ -278,7 +241,6 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
               value={inputValue}
               onChange={(e) => {
                 setInputValue(e.target.value);
-                setShowInvalidSelectionMessage(false);
                 setShowSuggestions(true);
               }}
               onKeyDown={onKeyDown}
@@ -336,7 +298,7 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
           <button
             type="submit"
             className="rounded-xl bg-[var(--color-accent)] px-5 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:rounded-2xl sm:px-6 sm:py-4 sm:text-lg"
-            disabled={!canSubmit || !isMatchingPoolSong}
+            disabled={!canSubmit}
           >
             Guess
           </button>
@@ -345,11 +307,6 @@ export default function GuessInput({ attemptsUsed }: GuessInputProps) {
         {isDuplicateGuess && (
           <p className="mt-3 text-sm font-semibold text-red-300">
             You already tried that song in this round.
-          </p>
-        )}
-        {!isDuplicateGuess && showInvalidSelectionMessage && poolReady && (
-          <p className="mt-3 text-sm font-semibold text-amber-300">
-            Choose a song from the suggestions list to guess.
           </p>
         )}
       </div>

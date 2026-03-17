@@ -2,6 +2,10 @@ import type { LyricSnippet } from '@/types/game';
 
 const MIN_LINE_LENGTH = 8;
 
+function normalizeLineKey(line: string): string {
+  return line.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 function cleanLine(line: string): string {
   return line
     .replace(/\[.*?\]/g, '') // Remove section headers like [Chorus]
@@ -18,10 +22,19 @@ function splitIntoLines(lyrics: string): string[] {
 function lineRepetitionMap(lines: string[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const line of lines) {
-    const key = line.toLowerCase().replace(/\s+/g, ' ').trim();
+    const key = normalizeLineKey(line);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return counts;
+}
+
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const nextIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[nextIndex]] = [result[nextIndex], result[index]];
+  }
+  return result;
 }
 
 function scoreLine(
@@ -62,27 +75,43 @@ export function selectLyricSnippets(lyrics: string, count = 5): LyricSnippet[] {
     index: i,
     score: scoreLine(
       line,
-      repetitions.get(line.toLowerCase().replace(/\s+/g, ' ').trim()) ?? 1,
+      repetitions.get(normalizeLineKey(line)) ?? 1,
       i,
       lines.length,
     ),
   }));
 
-  // Sort by score ascending (hardest first)
-  scored.sort((a, b) => a.score - b.score);
-
-  // Select up to `count` lines, deduplicating exact repeats.
-  const selected: typeof scored = [];
+  const deduped: typeof scored = [];
   const seen = new Set<string>();
 
   for (const item of scored) {
-    if (selected.length >= count) break;
-    const key = item.line.toLowerCase().replace(/\s+/g, ' ').trim();
+    const key = normalizeLineKey(item.line);
     if (!seen.has(key)) {
       seen.add(key);
-      selected.push(item);
+      deduped.push(item);
     }
   }
+
+  deduped.sort((a, b) => a.score - b.score);
+
+  const candidatePoolSize = Math.min(
+    deduped.length,
+    Math.max(count * 3, count),
+  );
+  const candidatePool = deduped.slice(0, candidatePoolSize);
+  const randomizedCandidates = shuffleArray(candidatePool);
+
+  const selected = randomizedCandidates.slice(0, count);
+  if (selected.length < count) {
+    selected.push(
+      ...deduped.slice(
+        candidatePoolSize,
+        candidatePoolSize + (count - selected.length),
+      ),
+    );
+  }
+
+  selected.sort((a, b) => a.score - b.score || a.index - b.index);
 
   return selected.map(
     (item, snippetIndex): LyricSnippet => ({

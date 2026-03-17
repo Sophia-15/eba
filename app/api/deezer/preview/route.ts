@@ -1,4 +1,4 @@
-import { findDeezerPreview } from '@/lib/deezerServer';
+import { findBestPreview } from '@/lib/deezerServer';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -14,10 +14,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const previewUrl = await findDeezerPreview(title, artist);
+    const previewUrl = await findBestPreview(title, artist);
     return NextResponse.json({ previewUrl });
   } catch (error) {
-    console.error('Deezer preview lookup failed:', error);
+    console.error('Preview lookup failed:', error);
     return NextResponse.json(
       { error: 'Failed to fetch preview' },
       { status: 502 },

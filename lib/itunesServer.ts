@@ -1,18 +1,11 @@
-import { findItunesPreview } from './itunesServer';
-
-interface DeezerArtist {
-  name: string;
+interface ITunesTrack {
+  trackName?: string;
+  artistName?: string;
+  previewUrl?: string;
 }
 
-interface DeezerTrack {
-  id: number;
-  title: string;
-  preview: string;
-  artist: DeezerArtist;
-}
-
-interface DeezerSearchResponse {
-  data?: DeezerTrack[];
+interface ITunesSearchResponse {
+  results?: ITunesTrack[];
 }
 
 interface PreviewCacheEntry {
@@ -20,7 +13,7 @@ interface PreviewCacheEntry {
   expiresAt: number;
 }
 
-const DEEZER_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const ITUNES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const previewCache = new Map<string, PreviewCacheEntry>();
 
 function normalizeTerm(value: string): string {
@@ -43,7 +36,7 @@ function buildCacheKey(title: string, artist: string): string {
 }
 
 function pickBestPreview(
-  tracks: DeezerTrack[],
+  tracks: ITunesTrack[],
   title: string,
   artist: string,
 ): string {
@@ -51,10 +44,10 @@ function pickBestPreview(
   const normalizedArtist = normalizeTerm(artist);
 
   const ranked = tracks
-    .filter((track) => typeof track.preview === 'string' && track.preview)
+    .filter((track) => typeof track.previewUrl === 'string' && track.previewUrl)
     .map((track) => {
-      const trackTitle = normalizeTerm(track.title);
-      const trackArtist = normalizeTerm(track.artist?.name ?? '');
+      const trackTitle = normalizeTerm(track.trackName ?? '');
+      const trackArtist = normalizeTerm(track.artistName ?? '');
       const titleExact = trackTitle === normalizedTitle;
       const titleIncludes =
         trackTitle.includes(normalizedTitle) ||
@@ -74,10 +67,10 @@ function pickBestPreview(
     })
     .sort((left, right) => right.score - left.score);
 
-  return ranked[0]?.track.preview ?? '';
+  return ranked[0]?.track.previewUrl ?? '';
 }
 
-export async function findDeezerPreview(
+export async function findItunesPreview(
   title: string,
   artist: string,
 ): Promise<string> {
@@ -88,9 +81,9 @@ export async function findDeezerPreview(
     return cached.previewUrl;
   }
 
-  const query = `track:"${title}" artist:"${artist}"`;
+  const query = `${title} ${artist}`;
   const response = await fetch(
-    `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`,
+    `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=10`,
     {
       next: { revalidate: 86400 },
       cache: 'force-cache',
@@ -98,40 +91,16 @@ export async function findDeezerPreview(
   );
 
   if (!response.ok) {
-    throw new Error(`Deezer search failed with status ${response.status}`);
+    throw new Error(`iTunes search failed with status ${response.status}`);
   }
 
-  const data = (await response.json()) as DeezerSearchResponse;
-  const previewUrl = pickBestPreview(data.data ?? [], title, artist);
+  const data = (await response.json()) as ITunesSearchResponse;
+  const previewUrl = pickBestPreview(data.results ?? [], title, artist);
 
   previewCache.set(cacheKey, {
     previewUrl,
-    expiresAt: Date.now() + DEEZER_CACHE_TTL_MS,
+    expiresAt: Date.now() + ITUNES_CACHE_TTL_MS,
   });
 
   return previewUrl;
-}
-
-export async function findBestPreview(
-  title: string,
-  artist: string,
-): Promise<string> {
-  try {
-    const deezerPreview = await findDeezerPreview(title, artist);
-    if (deezerPreview) {
-      return deezerPreview;
-    }
-  } catch (error) {
-    console.error(
-      'Deezer preview lookup failed, falling back to iTunes:',
-      error,
-    );
-  }
-
-  try {
-    return await findItunesPreview(title, artist);
-  } catch (error) {
-    console.error('iTunes preview lookup failed:', error);
-    return '';
-  }
 }

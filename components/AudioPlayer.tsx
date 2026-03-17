@@ -37,11 +37,19 @@ export default function AudioPlayer({
   const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState(previewUrl);
   const [isFetchingPreview, setIsFetchingPreview] = useState(false);
   const [previewUnavailable, setPreviewUnavailable] = useState(false);
-  const { isPlaying, isLoaded, isError, play, pause, seek, getTime } =
+  const { isPlaying, currentTime, play, pause, seek, getTime } =
     useAudio(resolvedPreviewUrl);
 
   const progressBarRef = useRef<HTMLDivElement>(null);
   const timeCurrentRef = useRef<HTMLSpanElement>(null);
+  const stopTimeoutRef = useRef<number | null>(null);
+
+  function clearStopTimeout() {
+    if (stopTimeoutRef.current !== null) {
+      window.clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
+    }
+  }
 
   useEffect(() => {
     setResolvedPreviewUrl(previewUrl);
@@ -93,38 +101,57 @@ export default function AudioPlayer({
 
   const canPlayPreview = Boolean(resolvedPreviewUrl) && !previewUnavailable;
 
-  // Smooth progress via requestAnimationFrame — direct DOM writes, no React re-renders.
   useEffect(() => {
-    if (!isPlaying || !canPlayPreview) return;
+    const boundedTime = Math.min(currentTime, HINT_DURATION_SECONDS);
+    const percent = Math.min(100, (boundedTime / HINT_DURATION_SECONDS) * 100);
 
-    let rafId: number;
-
-    function tick() {
-      const time = getTime();
-
-      if (time >= HINT_DURATION_SECONDS) {
-        if (progressBarRef.current) progressBarRef.current.style.width = '100%';
-        if (timeCurrentRef.current)
-          timeCurrentRef.current.textContent = formatTime(
-            HINT_DURATION_SECONDS,
-          );
-        pause();
-        seek(HINT_DURATION_SECONDS);
-        return;
-      }
-
-      const percent = Math.min(100, (time / HINT_DURATION_SECONDS) * 100);
-      if (progressBarRef.current)
-        progressBarRef.current.style.width = `${percent}%`;
-      if (timeCurrentRef.current)
-        timeCurrentRef.current.textContent = formatTime(time);
-
-      rafId = requestAnimationFrame(tick);
+    if (progressBarRef.current) {
+      progressBarRef.current.style.width = `${percent}%`;
     }
 
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
+    if (timeCurrentRef.current) {
+      timeCurrentRef.current.textContent = formatTime(boundedTime);
+    }
+  }, [currentTime]);
+
+  useEffect(() => {
+    if (!isPlaying || !canPlayPreview) {
+      clearStopTimeout();
+      return;
+    }
+
+    const remainingMs = Math.max(0, (HINT_DURATION_SECONDS - getTime()) * 1000);
+
+    clearStopTimeout();
+    stopTimeoutRef.current = window.setTimeout(() => {
+      pause();
+      seek(HINT_DURATION_SECONDS);
+      if (progressBarRef.current) {
+        progressBarRef.current.style.width = '100%';
+      }
+      if (timeCurrentRef.current) {
+        timeCurrentRef.current.textContent = formatTime(HINT_DURATION_SECONDS);
+      }
+    }, remainingMs);
+
+    return () => {
+      clearStopTimeout();
+    };
   }, [isPlaying, canPlayPreview, getTime, pause, seek]);
+
+  useEffect(() => {
+    if (currentTime < HINT_DURATION_SECONDS) return;
+
+    clearStopTimeout();
+    pause();
+    seek(HINT_DURATION_SECONDS);
+  }, [currentTime, pause, seek]);
+
+  useEffect(() => {
+    return () => {
+      clearStopTimeout();
+    };
+  }, []);
 
   function handleToggle() {
     if (isPlaying) {

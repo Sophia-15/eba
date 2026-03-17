@@ -36,37 +36,73 @@ export function splitGuessParts(input: string): {
   titlePart: string;
   artistPart: string;
 } {
-  // Only match spaced separators to avoid splitting within hyphenated titles (e.g. "Spider-Man").
-  const separators = [' - ', ' — ', ' – '];
-  const found = separators.find((sep) => input.includes(sep));
-  if (!found) {
+  const candidates = enumerateGuessParts(input).filter(
+    (candidate) => candidate.artistPart.length > 0,
+  );
+
+  if (candidates.length === 0) {
     return { titlePart: input, artistPart: '' };
   }
 
-  const idx = input.indexOf(found);
-  return {
-    titlePart: input.slice(0, idx).trim(),
-    artistPart: input.slice(idx + found.length).trim(),
-  };
+  // Prefer the candidate with the longest title part, so titles like
+  // "Something - Something Else - Artist" keep internal hyphens in the title.
+  return candidates.sort(
+    (left, right) => right.titlePart.length - left.titlePart.length,
+  )[0];
+}
+
+function enumerateGuessParts(input: string): Array<{
+  titlePart: string;
+  artistPart: string;
+}> {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return [{ titlePart: '', artistPart: '' }];
+  }
+
+  const candidates: Array<{ titlePart: string; artistPart: string }> = [
+    { titlePart: trimmed, artistPart: '' },
+  ];
+
+  // Only consider separators with surrounding spaces so hyphenated words
+  // like "Spider-Man" or "Jay-Z" are not split.
+  const separatorRegex = /\s[-–—]\s/g;
+  for (const match of trimmed.matchAll(separatorRegex)) {
+    const separatorIndex = match.index;
+    const separatorLength = match[0]?.length ?? 0;
+    if (separatorIndex === undefined || separatorLength === 0) continue;
+
+    const titlePart = trimmed.slice(0, separatorIndex).trim();
+    const artistPart = trimmed.slice(separatorIndex + separatorLength).trim();
+    if (!titlePart) continue;
+
+    candidates.push({ titlePart, artistPart });
+  }
+
+  return candidates;
 }
 
 export function guessesReferToSameSong(left: string, right: string): boolean {
-  const leftParts = splitGuessParts(left);
-  const rightParts = splitGuessParts(right);
-  const leftTitle = normaliseForGuess(leftParts.titlePart || left);
-  const rightTitle = normaliseForGuess(rightParts.titlePart || right);
-  const leftArtist = normaliseForGuess(leftParts.artistPart);
-  const rightArtist = normaliseForGuess(rightParts.artistPart);
+  const leftCandidates = enumerateGuessParts(left);
+  const rightCandidates = enumerateGuessParts(right);
 
-  if (!leftTitle || !rightTitle || leftTitle !== rightTitle) {
-    return false;
+  for (const leftCandidate of leftCandidates) {
+    const leftTitle = normaliseForGuess(leftCandidate.titlePart || left);
+    const leftArtist = normaliseForGuess(leftCandidate.artistPart);
+    if (!leftTitle) continue;
+
+    for (const rightCandidate of rightCandidates) {
+      const rightTitle = normaliseForGuess(rightCandidate.titlePart || right);
+      if (!rightTitle || rightTitle !== leftTitle) continue;
+
+      const rightArtist = normaliseForGuess(rightCandidate.artistPart);
+      if (!leftArtist || !rightArtist || leftArtist === rightArtist) {
+        return true;
+      }
+    }
   }
 
-  if (!leftArtist || !rightArtist) {
-    return true;
-  }
-
-  return leftArtist === rightArtist;
+  return false;
 }
 
 export function validateGuess(input: string, correctAnswer: string): boolean {
@@ -87,27 +123,36 @@ export function evaluateGuess(
   correctTitle: string,
   artistName: string,
 ): GuessResult {
-  const { titlePart, artistPart } = splitGuessParts(input);
+  const guessCandidates = enumerateGuessParts(input);
 
-  if (
-    validateGuess(input, correctTitle) ||
-    validateGuess(titlePart, correctTitle)
-  ) {
+  if (validateGuess(input, correctTitle)) {
+    return GuessResult.CORRECT;
+  }
+
+  const titleMatched = guessCandidates.some((candidate) =>
+    validateGuess(candidate.titlePart, correctTitle),
+  );
+
+  if (titleMatched) {
     return GuessResult.CORRECT;
   }
 
   const normInput = normaliseForGuess(input);
-  const normTitlePart = normaliseForGuess(titlePart);
-  const normArtistPart = normaliseForGuess(artistPart);
   const normArtist = normaliseForGuess(artistName);
 
   if (normInput && normArtist) {
     const artistMaxDistance =
       normArtist.length <= 6 ? 1 : Math.floor(normArtist.length * 0.15);
 
-    const artistCandidates = [normInput, normTitlePart, normArtistPart].filter(
-      Boolean,
-    );
+    const artistCandidates = [
+      normInput,
+      ...guessCandidates.map((candidate) =>
+        normaliseForGuess(candidate.titlePart),
+      ),
+      ...guessCandidates.map((candidate) =>
+        normaliseForGuess(candidate.artistPart),
+      ),
+    ].filter(Boolean);
 
     const artistMatched = artistCandidates.some((candidate) => {
       const candidateDistance = levenshtein(candidate, normArtist);
